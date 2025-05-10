@@ -1,133 +1,70 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LogIn, BarChart } from 'lucide-react';
-import Button from '../components/ui/Button';
-import Input from '../components/ui/Input';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../components/ui/Card';
 
-const Login: React.FC = () => {
+export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  const { signIn, user, error: authError } = useAuth();
+  const { signIn, user, loading, error } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
 
+  // once we have user, redirect
   useEffect(() => {
     if (user) {
-      const dest = user.role === 'admin'
-        ? '/dashboard/admin'
-        : user.role === 'client'
-        ? '/dashboard/client'
-        : '/dashboard/technician';
+      const dest =
+        user.role === 'admin'
+          ? '/dashboard/admin'
+          : user.role === 'client'
+          ? '/dashboard/client'
+          : '/dashboard/technician';
       navigate(dest, { replace: true });
     }
-  }, [user, navigate]);
-
-  useEffect(() => {
-    if (authError) {
-      setFormError(authError);
-      setIsSubmitting(false);
-    }
-  }, [authError]);
+  }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting) return;
-
     setFormError(null);
-    setIsSubmitting(true);
-
-    try {
-      await signIn(email, password);
-    } catch (err: any) {
-      setFormError(err.message || 'Failed to sign in');
-      setIsSubmitting(false);
-    }
+    await signIn(email, password);
+    if (error) setFormError(error);
   };
 
   return (
-    <div className="min-h-screen bg-neutral-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex justify-center">
-          <div className="h-12 w-12 bg-primary-600 text-white flex items-center justify-center rounded-lg">
-            <BarChart className="h-8 w-8" />
-          </div>
+    <div className="min-h-screen flex items-center justify-center">
+      <form onSubmit={handleSubmit} className="p-6 border rounded">
+        <h1 className="text-2xl mb-4">Sign in to FLUX</h1>
+        {formError && <div className="mb-2 text-red-600">{formError}</div>}
+        <div className="mb-2">
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            className="w-full p-2 border"
+            required
+          />
         </div>
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-neutral-900">
-          Sign in to FLUX
-        </h2>
-        <p className="mt-2 text-center text-sm text-neutral-600">
-          Welcome back! Please sign in to continue.
+        <div className="mb-4">
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            className="w-full p-2 border"
+            required
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={loading}
+          className={`w-full p-2 bg-blue-500 text-white ${loading ? 'opacity-50' : ''}`}
+        >
+          {loading ? 'Loading…' : 'Sign in'}
+        </button>
+        <p className="mt-4 text-sm">
+          Don’t have an account? <Link to="/signup" className="text-blue-600">Sign up</Link>
         </p>
-      </div>
-
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <Card>
-          <form onSubmit={handleSubmit}>
-            <CardHeader>
-              <CardTitle>Sign In</CardTitle>
-              <CardDescription>
-                Enter your credentials to access your account
-              </CardDescription>
-            </CardHeader>
-
-            <CardContent className="space-y-4">
-              {formError && (
-                <div className="bg-error-50 border border-error-300 text-error-700 px-4 py-3 rounded-md text-sm">
-                  {formError}
-                </div>
-              )}
-
-              <Input
-                label="Email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                fullWidth
-                required
-                disabled={isSubmitting}
-              />
-
-              <Input
-                label="Password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                fullWidth
-                required
-                disabled={isSubmitting}
-              />
-            </CardContent>
-
-            <CardFooter className="flex flex-col space-y-4">
-              <Button
-                type="submit"
-                fullWidth
-                disabled={isSubmitting}
-                isLoading={isSubmitting}
-              >
-                {!isSubmitting && <LogIn className="h-4 w-4 mr-2" />}
-                Sign in
-              </Button>
-
-              <p className="text-center text-sm text-neutral-600">
-                Don't have an account?{' '}
-                <Link to="/signup" className="font-medium text-primary-600 hover:text-primary-500">
-                  Sign up
-                </Link>
-              </p>
-            </CardFooter>
-          </form>
-        </Card>
-      </div>
+      </form>
     </div>
   );
-};
-
-export default Login;
+}
