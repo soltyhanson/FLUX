@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+iimport React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, UserData } from '../lib/supabaseClient';
 
@@ -21,7 +21,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [error, setError] = useState<string | null>(null);
 
   const fetchUserData = async (id: string) => {
-    console.log('[Auth] 🔍 fetchUserData start for ID:', id);
     try {
       const { data, error: fetchError } = await supabase
         .from<UserData>('users')
@@ -33,7 +32,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (err: any) {
       setError(err.message);
     } finally {
-      console.log('[Auth] ✅ fetchUserData done — clearing loading');
       setLoading(false);
     }
   };
@@ -49,8 +47,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     });
 
-    // auth state change
-    const { subscription } = supabase.auth.onAuthStateChange((_, sess) => {
+    // subscribe to auth changes
+    const { data } = supabase.auth.onAuthStateChange((_, sess) => {
       setSession(sess);
       if (sess?.user) {
         fetchUserData(sess.user.id);
@@ -59,8 +57,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setLoading(false);
       }
     });
+    const subscription = data.subscription;
 
-    return () => subscription.unsubscribe();
+    // cleanup
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
