@@ -27,7 +27,7 @@ const Login: React.FC = () => {
         : '/dashboard/technician';
       navigate(dest);
     }
-  }, [user]);
+  }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
