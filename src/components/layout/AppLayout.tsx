@@ -30,7 +30,7 @@ export default function Layout({ children }: LayoutProps) {
       <main className="flex-1 p-8 bg-gray-50"> {children} </main>
       <footer className="text-center py-4 text-sm text-gray-500">
         &copy; {new Date().getFullYear()} FLUX Platform
-      <//footer>
+      </footer>
     </div>
   );
 }
