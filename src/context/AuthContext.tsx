@@ -32,7 +32,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Fetch user profile from 'users' table
   const fetchUserData = async (id: string) => {
     console.log('[Auth] 🔍 fetchUserData start for ID:', id);
-    console.log('[Auth] 📡 Calling supabase.from("users")…');
     try {
       const { data, error: fetchError } = await supabase
         .from('users')
@@ -41,18 +40,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
 
       console.log('[Auth] 🎉 supabase response:', { data, fetchError });
-      if (fetchError) throw fetchError;
+      
+      if (fetchError) {
+        if (fetchError.code === 'PGRST116') {
+          console.warn('[Auth] ⚠️ No user profile row found');
+          setUser(null);
+          throw new Error('User profile not found');
+        }
+        throw fetchError;
+      }
+
       if (!data) {
-        console.warn('[Auth] ⚠️ No user profile row found');
+        console.warn('[Auth] ⚠️ No user profile data returned');
+        setUser(null);
         throw new Error('User profile not found');
       }
+
       setUser(data);
     } catch (err: any) {
       console.error('[Auth] ❌ fetchUserData error:', err.message);
       setError(err.message);
       throw err;
     } finally {
-      console.log('[Auth] ✅ fetchUserData done — setting loading=false');
       setLoading(false);
     }
   };
@@ -66,7 +75,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       if (session?.user) {
         console.log('[Auth] 👤 Existing session detected, fetching user data');
-        fetchUserData(session.user.id).catch(console.error);
+        fetchUserData(session.user.id).catch(() => {
+          setUser(null);
+          setLoading(false);
+        });
       } else {
         console.log('[Auth] 🚫 No session found — clearing loading');
         setLoading(false);
@@ -79,7 +91,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       if (session?.user) {
         console.log('[Auth] 👤 New session detected, fetching user data');
-        fetchUserData(session.user.id).catch(console.error);
+        fetchUserData(session.user.id).catch(() => {
+          setUser(null);
+          setLoading(false);
+        });
       } else {
         console.log('[Auth] 🚪 Signed out — clearing user & loading');
         setUser(null);
@@ -98,13 +113,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('[Auth] 🔑 signIn called');
     setLoading(true);
     setError(null);
+    
     try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({ 
+        email, 
+        password 
+      });
+      
       if (signInError) throw signInError;
-      if (data.session?.user) {
-        console.log('[Auth] 🎉 signIn successful, user:', data.session.user);
-        await fetchUserData(data.session.user.id);
+      
+      if (!data.session?.user) {
+        throw new Error('Sign in failed - no session returned');
       }
+
+      console.log('[Auth] 🎉 signIn successful, user:', data.session.user);
+      await fetchUserData(data.session.user.id);
     } catch (err: any) {
       console.error('[Auth] ❌ signIn error:', err.message);
       setError('Invalid email or password');
@@ -119,29 +142,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('[Auth] 🆕 signUp called');
     setLoading(true);
     setError(null);
+
     try {
-      const { data, error: signUpError } = await supabase.auth.signUp({ email, password });
+      const { data, error: signUpError } = await supabase.auth.signUp({ 
+        email, 
+        password 
+      });
+
       if (signUpError) {
         if (signUpError.message.includes('already registered')) {
           throw new Error('This email is already registered. Please sign in instead.');
         }
         throw signUpError;
       }
-      
+
       if (!data.user) {
-        throw new Error('Signup failed - no user returned');
+        throw new Error('Sign up failed - no user returned');
       }
 
       console.log('[Auth] 📝 Inserting user profile row');
       const { error: insertError } = await supabase
         .from('users')
-        .insert([{ id: data.user.id, email: data.user.email!, role }]);
-      
+        .insert([{ 
+          id: data.user.id, 
+          email: data.user.email!, 
+          role 
+        }]);
+
       if (insertError) {
         console.error('[Auth] ❌ insert user row error:', insertError.message);
         throw new Error('Failed to create user profile');
       }
-      
+
       console.log('[Auth] 🎉 User profile inserted, fetching data');
       await fetchUserData(data.user.id);
     } catch (err: any) {
