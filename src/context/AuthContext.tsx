@@ -38,11 +38,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from<UserData>('users')
         .select('id, email, role')
         .eq('id', id)
-        .single();
+        .maybeSingle();
 
       console.log('[Auth] 🎉 supabase response:', { data, fetchError });
       if (fetchError) throw fetchError;
-      setUser(data!);
+      if (!data) {
+        console.warn('[Auth] ⚠️ No user profile row found');
+      }
+      setUser(data || null);
     } catch (err: any) {
       console.error('[Auth] ❌ fetchUserData error:', err.message);
       setError(err.message);
