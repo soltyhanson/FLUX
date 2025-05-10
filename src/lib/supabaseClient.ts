@@ -6,8 +6,8 @@ const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!url || !key) {
   throw new Error(
-    'Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY. ' +
-    'Please check your .env file and restart the server.'
+    'Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY environment variables.\n' +
+    'Please click the "Connect to Supabase" button in the top right to set up your database connection.'
   );
 }
 
@@ -18,4 +18,5 @@ export interface UserData {
   id: string;
   email: string;
   role: 'admin' | 'client' | 'technician';
+  created_at?: string;
 }
