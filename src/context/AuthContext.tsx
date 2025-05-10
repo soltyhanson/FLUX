@@ -1,10 +1,4 @@
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  ReactNode,
-} from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, UserData } from '../lib/supabaseClient';
 
@@ -26,14 +20,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // fetch profile from public.users
+  // Fetch user profile from our users table
   const fetchUserData = async (id: string) => {
     try {
       const { data, error: fetchError } = await supabase
         .from<UserData>('users')
         .select('id,email,role')
         .eq('id', id)
-        .maybeSingle();    // returns null instead of throwing 406
+        .maybeSingle();
       if (fetchError) throw fetchError;
       setUser(data || null);
     } catch (err: any) {
@@ -41,8 +35,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // on mount, grab session + subscribe
   useEffect(() => {
+    // On mount: get initial session
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       if (data.session?.user) {
@@ -52,7 +46,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     });
 
-    const { subscription } = supabase.auth.onAuthStateChange((_event, sess) => {
+    // Subscribe to auth changes
+    const { subscription } = supabase.auth.onAuthStateChange((_, sess) => {
       setSession(sess);
       if (sess?.user) {
         fetchUserData(sess.user.id);
@@ -62,16 +57,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     });
 
-    return () => subscription.unsubscribe();
+    // Cleanup on unmount
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
+  // Sign in with email/password
   const signIn = async (email: string, password: string) => {
     setLoading(true);
     setError(null);
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
     if (signInError) {
       setError(signInError.message);
       setLoading(false);
@@ -83,13 +79,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setLoading(false);
   };
 
+  // Sign up and insert into users table
   const signUp = async (email: string, password: string, role: UserData['role']) => {
     setLoading(true);
     setError(null);
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-    });
+    const { data, error: signUpError } = await supabase.auth.signUp({ email, password });
     if (signUpError) {
       setError(signUpError.message);
       setLoading(false);
@@ -109,6 +103,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setLoading(false);
   };
 
+  // Sign out
   const signOut = async () => {
     setLoading(true);
     await supabase.auth.signOut();
@@ -118,16 +113,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <AuthContext.Provider
-      value={{ session, user, loading, error, signIn, signUp, signOut }}
-    >
+    <AuthContext.Provider value={{ session, user, loading, error, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
 export const useAuth = (): AuthContextType => {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
-  return ctx;
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
+  return context;
 };
