@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../components/ui/Card';
+import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
+import { UserPlus, BarChart } from 'lucide-react';
 
 const Signup: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -8,7 +12,7 @@ const Signup: React.FC = () => {
   const [role, setRole] = useState<'client' | 'technician'>('client');
   const [formError, setFormError] = useState<string | null>(null);
 
-  const { signUp, user, loading, error } = useAuth();
+  const { signUp, user, loading } = useAuth();
   const navigate = useNavigate();
 
   // Redirect on successful signup
@@ -33,65 +37,103 @@ const Signup: React.FC = () => {
       return;
     }
 
-    await signUp(email.trim(), password, role);
-    if (error) {
-      setFormError(error);
+    try {
+      await signUp(email.trim(), password, role);
+    } catch (err: any) {
+      setFormError(err.message);
     }
   };
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
-      <div style={{ width: 360, padding: 24, border: '1px solid #ddd', borderRadius: 8 }}>
-        <h1 style={{ textAlign: 'center' }}>FLUX Signup</h1>
-        {formError && <div style={{ color: 'red', marginBottom: 16 }}>{formError}</div>}
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: 12 }}>
-            <label>Email address</label>
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-              style={{ width: '100%', padding: 8, boxSizing: 'border-box' }}
-            />
+    <div className="min-h-screen bg-neutral-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="flex justify-center">
+          <div className="h-12 w-12 bg-primary-600 text-white flex items-center justify-center rounded-lg">
+            <BarChart className="h-8 w-8" />
           </div>
-          <div style={{ marginBottom: 12 }}>
-            <label>Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              style={{ width: '100%', padding: 8, boxSizing: 'border-box' }}
-            />
-          </div>
-          <div style={{ marginBottom: 16 }}>
-            <label>Account type</label>
-            <select
-              value={role}
-              onChange={e => setRole(e.target.value as 'client' | 'technician')}
-              style={{ width: '100%', padding: 8, boxSizing: 'border-box' }}
-            >
-              <option value="client">Client</option>
-              <option value="technician">Technician</option>
-            </select>
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            style={{ width: '100%', padding: 12, backgroundColor: '#007bff', color: '#fff', border: 'none', borderRadius: 4 }}
-          >
-            {loading ? 'Loading...' : 'Sign Up'}
-          </button>
-        </form>
-        <p style={{ marginTop: 16, textAlign: 'center' }}>
-          Already have an account? <Link to="/login">Sign in</Link>
+        </div>
+        <h2 className="mt-6 text-center text-3xl font-extrabold text-neutral-900">
+          Create your account
+        </h2>
+        <p className="mt-2 text-center text-sm text-neutral-600">
+          Join FLUX and get started today
         </p>
+      </div>
+
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+        <Card className="animate-fade-in">
+          <CardHeader>
+            <CardTitle>Sign Up</CardTitle>
+            <CardDescription>
+              Enter your details to create your account
+            </CardDescription>
+          </CardHeader>
+
+          <form onSubmit={handleSubmit}>
+            <CardContent className="space-y-4">
+              {formError && (
+                <div className="bg-error-50 border border-error-300 text-error-700 px-4 py-3 rounded-md text-sm">
+                  {formError}
+                </div>
+              )}
+
+              <Input
+                label="Email address"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                fullWidth
+                required
+              />
+
+              <Input
+                label="Password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                fullWidth
+                required
+              />
+
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Account type
+                </label>
+                <select
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as 'client' | 'technician')}
+                  className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-neutral-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
+                >
+                  <option value="client">Client</option>
+                  <option value="technician">Technician</option>
+                </select>
+              </div>
+            </CardContent>
+
+            <CardFooter className="flex flex-col space-y-4">
+              <Button
+                type="submit"
+                fullWidth
+                isLoading={loading}
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                Create Account
+              </Button>
+
+              <p className="text-center text-sm text-neutral-600">
+                Already have an account?{' '}
+                <Link to="/login" className="font-medium text-primary-600 hover:text-primary-500">
+                  Sign in
+                </Link>
+              </p>
+            </CardFooter>
+          </form>
+        </Card>
       </div>
     </div>
   );
 };
 
 export default Signup;
-
-
