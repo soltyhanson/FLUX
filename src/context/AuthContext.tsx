@@ -1,280 +1,156 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session } from '@supabase/supabase-js';
-import { supabase, User, UserRole } from '../lib/supabaseClient';
+import { supabase } from '../lib/supabaseClient';
+
+// Define the shape of user data
+export interface UserData {
+  id: string;
+  email: string;
+  role: 'admin' | 'client' | 'technician';
+}
+
+type UserRole = UserData['role'];
 
 interface AuthContextType {
   session: Session | null;
-  user: User | null;
+  user: UserData | null;
   loading: boolean;
   error: string | null;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, role: string) => Promise<void>;
+  signUp: (email: string, password: string, role: UserRole) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | null>(null);
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch a single user row
-  async function fetchUserData(id: string) {
-    console.log('🔍 Fetching user data for ID:', id);
-    console.log('📡 Supabase URL:', supabase.supabaseUrl);
-    console.log('🔑 Using anon key:', supabase.supabaseKey.slice(0, 8) + '...');
-    
-    setLoading(true);
+  // Fetch user profile from 'users' table
+  const fetchUserData = async (id: string) => {
+    console.log('[Auth] 🔍 fetchUserData start for ID:', id);
+    console.log('[Auth] 📡 Calling supabase.from("users")…');
     try {
-      console.log('🔎 Executing Supabase query...');
-      const { data, error, status, statusText } = await supabase
-        .from('users')
+      const { data, error: fetchError } = await supabase
+        .from<UserData>('users')
         .select('id, email, role')
         .eq('id', id)
         .single();
 
-      console.log('📊 Full Supabase response:', {
-        data,
-        error,
-        status,
-        statusText,
-        hasData: !!data,
-        errorMessage: error?.message,
-        errorDetails: error?.details
-      });
-
-      if (error) {
-        console.error('❌ Error fetching user data:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        });
-        setError(error.message);
-        setLoading(false);
-        return;
-      }
-
-      if (!data) {
-        console.warn('⚠️ No user data found for ID:', id);
-        setError('User data not found');
-        setLoading(false);
-        return;
-      }
-
-      console.log('✅ User data retrieved:', {
-        id: data.id,
-        email: data.email,
-        role: data.role
-      });
-      setUser(data);
+      console.log('[Auth] 🎉 supabase response:', { data, fetchError });
+      if (fetchError) throw fetchError;
+      setUser(data!);
     } catch (err: any) {
-      console.error('❌ Exception in fetchUserData:', {
-        name: err.name,
-        message: err.message,
-        stack: err.stack
-      });
+      console.error('[Auth] ❌ fetchUserData error:', err.message);
       setError(err.message);
     } finally {
-      console.log('🏁 Finished fetching user data');
+      console.log('[Auth] ✅ fetchUserData done — setting loading=false');
       setLoading(false);
     }
-  }
+  };
 
-  // Sign up, then insert into users table
-  async function signUp(email: string, password: string, role: string) {
-    console.log('📝 Starting sign up process for:', email);
-    setLoading(true);
-    try {
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-
-      console.log('🔑 Sign up response:', {
-        user: signUpData?.user?.id,
-        error: signUpError?.message
-      });
-
-      if (signUpError) {
-        console.error('❌ Sign up error:', signUpError);
-        setError(signUpError.message);
-        setLoading(false);
-        return;
-      }
-
-      const user = signUpData.user;
-      if (!user) {
-        console.error('❌ No user returned from sign up');
-        setError('Sign up failed - no user returned');
-        setLoading(false);
-        return;
-      }
-
-      console.log('👤 Inserting user data into users table:', {
-        id: user.id,
-        email: user.email,
-        role
-      });
-      
-      const { error: insertError } = await supabase
-        .from('users')
-        .insert([{ id: user.id, email: user.email, role }]);
-
-      if (insertError) {
-        console.error('❌ Error inserting user data:', {
-          message: insertError.message,
-          details: insertError.details,
-          hint: insertError.hint,
-          code: insertError.code
-        });
-        setError(insertError.message);
-        setLoading(false);
-        return;
-      }
-
-      console.log('✅ User data inserted successfully');
-      await fetchUserData(user.id);
-    } catch (err: any) {
-      console.error('❌ Exception in signUp:', {
-        name: err.name,
-        message: err.message,
-        stack: err.stack
-      });
-      setError(err.message);
-      setLoading(false);
-    }
-  }
-
-  async function signIn(email: string, password: string) {
-    console.log('🔐 Starting sign in process for:', email);
-    setLoading(true);
-    try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      console.log('🔑 Sign in response:', {
-        session: !!data.session,
-        user: data.user?.id,
-        error: signInError?.message
-      });
-
-      if (signInError) {
-        console.error('❌ Sign in error:', signInError);
-        setError(signInError.message);
-        setLoading(false);
-        return;
-      }
-
-      if (data.session?.user) {
-        console.log('✅ Sign in successful, fetching user data');
-        await fetchUserData(data.session.user.id);
-      } else {
-        console.error('❌ No session or user after sign in');
-        setError('Sign in failed - no session');
-        setLoading(false);
-      }
-    } catch (err: any) {
-      console.error('❌ Exception in signIn:', {
-        name: err.name,
-        message: err.message,
-        stack: err.stack
-      });
-      setError(err.message);
-      setLoading(false);
-    }
-  }
-
-  async function signOut() {
-    console.log('🚪 Starting sign out process');
-    try {
-      await supabase.auth.signOut();
-      console.log('✅ Sign out successful');
-      setUser(null);
-      setSession(null);
-    } catch (err: any) {
-      console.error('❌ Error during sign out:', {
-        name: err.name,
-        message: err.message,
-        stack: err.stack
-      });
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
+  // Initialize auth on mount
   useEffect(() => {
-    console.log('🔄 Setting up auth state listener');
-    
-    // Fetch the current session
-    const fetchSession = async () => {
-      console.log('📡 Fetching current session');
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log('📊 Current session:', {
-        exists: !!session,
-        userId: session?.user?.id
-      });
+    console.log('[Auth] 🔄 Setting up auth state listener');
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('[Auth] 📊 getSession returned:', session);
       setSession(session);
-      
-      if (session?.user?.id) {
-        console.log('👤 Session found, fetching user data');
-        await fetchUserData(session.user.id);
+      if (session?.user) {
+        console.log('[Auth] 👤 Existing session detected, fetching user data');
+        fetchUserData(session.user.id);
       } else {
-        console.log('ℹ️ No session found');
+        console.log('[Auth] 🚫 No session found — clearing loading');
         setLoading(false);
       }
-    };
+    });
 
-    fetchSession();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔄 Auth state changed:', event);
-      console.log('📊 New session:', {
-        exists: !!session,
-        userId: session?.user?.id
-      });
-      
+    // Subscribe to auth changes
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log('[Auth] 🔄 Auth state changed:', _event, session);
       setSession(session);
-      
-      if (session?.user?.id) {
-        console.log('👤 New session detected, fetching user data');
-        await fetchUserData(session.user.id);
+      if (session?.user) {
+        console.log('[Auth] 👤 New session detected, fetching user data');
+        fetchUserData(session.user.id);
       } else {
-        console.log('ℹ️ No session in auth change');
+        console.log('[Auth] 🚪 Signed out — clearing user & loading');
         setUser(null);
         setLoading(false);
       }
     });
 
     return () => {
-      console.log('🧹 Cleaning up auth state listener');
-      subscription.unsubscribe();
+      console.log('[Auth] 🧹 Cleaning up auth state listener');
+      listener.subscription.unsubscribe();
     };
   }, []);
 
-  const value = {
-    session,
-    user,
-    loading,
-    error,
-    signIn,
-    signUp,
-    signOut,
+  // Sign in existing user
+  const signIn = async (email: string, password: string) => {
+    console.log('[Auth] 🔑 signIn called');
+    setLoading(true);
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    if (signInError) {
+      console.error('[Auth] ❌ signIn error:', signInError.message);
+      setError(signInError.message);
+      setLoading(false);
+      return;
+    }
+    if (data.session?.user) {
+      console.log('[Auth] 🎉 signIn successful, user:', data.session.user);
+      await fetchUserData(data.session.user.id);
+    }
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  // Sign up new user + insert into 'users' table
+  const signUp = async (email: string, password: string, role: UserRole) => {
+    console.log('[Auth] 🆕 signUp called');
+    setLoading(true);
+    const { data, error: signUpError } = await supabase.auth.signUp({ email, password });
+    if (signUpError) {
+      console.error('[Auth] ❌ signUp error:', signUpError.message);
+      setError(signUpError.message);
+      setLoading(false);
+      return;
+    }
+    if (data.user) {
+      console.log('[Auth] 📝 Inserting user profile row');
+      const { error: insertError } = await supabase
+        .from('users')
+        .insert([{ id: data.user.id, email: data.user.email!, role }]);
+      if (insertError) {
+        console.error('[Auth] ❌ insert user row error:', insertError.message);
+        setError(insertError.message);
+        setLoading(false);
+        return;
+      }
+      console.log('[Auth] 🎉 User profile inserted, fetching data');
+      await fetchUserData(data.user.id);
+    }
+  };
+
+  // Sign out user
+  const signOut = async () => {
+    console.log('[Auth] 🚪 signOut called');
+    setLoading(true);
+    await supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
+    setLoading(false);
+  };
+
+  return (
+    <AuthContext.Provider value={{ session, user, loading, error, signIn, signUp, signOut }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
+  return context;
 };
