@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LogIn, BarChart } from 'lucide-react';
@@ -9,24 +9,40 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [localLoading, setLocalLoading] = useState(false);
   
-  const { signIn, loading } = useAuth();
+  const { signIn, user, loading, error } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
   const from = (location.state as any)?.from?.pathname || '/dashboard';
 
+  useEffect(() => {
+    if (user) {
+      const dest = user.role === 'admin'
+        ? '/dashboard/admin'
+        : user.role === 'client'
+        ? '/dashboard/client'
+        : '/dashboard/technician';
+      navigate(dest);
+    }
+  }, [user]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    
+    setFormError(null);
+    setLocalLoading(true);
+
     try {
       await signIn(email, password);
-      navigate(from, { replace: true });
+      if (error) {
+        setFormError(error);
+      }
     } catch (err: any) {
-      setError('Invalid email or password');
-      console.error('Login error:', err);
+      setFormError(err.message || 'Sign in failed');
+    } finally {
+      setLocalLoading(false);
     }
   };
 
@@ -57,9 +73,9 @@ const Login: React.FC = () => {
             </CardHeader>
 
             <CardContent className="space-y-4">
-              {error && (
+              {formError && (
                 <div className="bg-error-50 border border-error-300 text-error-700 px-4 py-3 rounded-md text-sm">
-                  {error}
+                  {formError}
                 </div>
               )}
 
@@ -88,7 +104,8 @@ const Login: React.FC = () => {
               <Button
                 type="submit"
                 fullWidth
-                isLoading={loading}
+                disabled={localLoading || loading}
+                isLoading={localLoading || loading}
               >
                 <LogIn className="h-4 w-4 mr-2" />
                 Sign in
