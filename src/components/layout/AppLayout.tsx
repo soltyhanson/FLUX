@@ -1,7 +1,7 @@
-// src/components/Layout.tsx
+// src/components/layout/AppLayout.tsx
 import React, { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 
 interface LayoutProps {
   children: ReactNode;
