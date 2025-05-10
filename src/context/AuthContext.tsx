@@ -1,14 +1,12 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Session } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabaseClient';
-
-export interface UserData {
-  id: string;
-  email: string;
-  role: 'admin' | 'client' | 'technician';
-}
-
-type UserRole = UserData['role'];
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from 'react';
+import type { Session } from '@supabase/supabase-js';
+import { supabase, UserData } from '../lib/supabaseClient';
 
 interface AuthContextType {
   session: Session | null;
@@ -16,166 +14,120 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, role: UserRole) => Promise<void>;
+  signUp: (email: string, password: string, role: UserData['role']) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<UserData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  // fetch profile from public.users
   const fetchUserData = async (id: string) => {
     try {
       const { data, error: fetchError } = await supabase
-        .from('users')
-        .select('id, email, role')
+        .from<UserData>('users')
+        .select('id,email,role')
         .eq('id', id)
-        .single();
-
+        .maybeSingle();    // returns null instead of throwing 406
       if (fetchError) throw fetchError;
-      if (!data) throw new Error('User profile not found');
-
-      setUser(data);
-      setError(null);
-      return data;
+      setUser(data || null);
     } catch (err: any) {
-      console.error('Error fetching user data:', err.message);
-      setUser(null);
       setError(err.message);
-      return null;
     }
   };
 
+  // on mount, grab session + subscribe
   useEffect(() => {
-    let mounted = true;
-
-    const initializeAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (mounted) {
-          setSession(session);
-          if (session?.user) {
-            await fetchUserData(session.user.id);
-          }
-        }
-      } catch (err) {
-        console.error('Auth initialization error:', err);
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    initializeAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (mounted) {
-        setSession(session);
-        if (session?.user) {
-          await fetchUserData(session.user.id);
-        } else {
-          setUser(null);
-        }
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      if (data.session?.user) {
+        fetchUserData(data.session.user.id);
+      } else {
         setLoading(false);
       }
     });
 
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
+    const { subscription } = supabase.auth.onAuthStateChange((_event, sess) => {
+      setSession(sess);
+      if (sess?.user) {
+        fetchUserData(sess.user.id);
+      } else {
+        setUser(null);
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    try {
-      setError(null);
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (signInError) {
-        throw signInError;
-      }
-
-      if (!data.user) {
-        throw new Error('No user returned after sign in');
-      }
-
-      const userData = await fetchUserData(data.user.id);
-      if (!userData) {
-        throw new Error('Failed to fetch user data');
-      }
-
-      setSession(data.session);
-      setUser(userData);
-    } catch (err: any) {
-      setError(err.message);
-      throw err;
-    }
-  };
-
-  const signUp = async (email: string, password: string, role: UserRole) => {
     setLoading(true);
     setError(null);
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (signInError) {
+      setError(signInError.message);
+      setLoading(false);
+      return;
+    }
+    if (data.session?.user) {
+      await fetchUserData(data.session.user.id);
+    }
+    setLoading(false);
+  };
 
-    try {
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password
-      });
-
-      if (signUpError) throw signUpError;
-      if (!data.user) throw new Error('No user after sign up');
-
+  const signUp = async (email: string, password: string, role: UserData['role']) => {
+    setLoading(true);
+    setError(null);
+    const { data, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+    if (signUpError) {
+      setError(signUpError.message);
+      setLoading(false);
+      return;
+    }
+    if (data.user) {
       const { error: insertError } = await supabase
         .from('users')
-        .insert([{
-          id: data.user.id,
-          email: data.user.email!,
-          role
-        }]);
-
-      if (insertError) throw insertError;
-
-      if (data.session) {
-        await fetchUserData(data.user.id);
+        .insert([{ id: data.user.id, email: data.user.email!, role }]);
+      if (insertError) {
+        setError(insertError.message);
+        setLoading(false);
+        return;
       }
-    } catch (err: any) {
-      setError(err.message);
-      throw err;
-    } finally {
-      setLoading(false);
+      await fetchUserData(data.user.id);
     }
+    setLoading(false);
   };
 
   const signOut = async () => {
-    try {
-      await supabase.auth.signOut();
-      setUser(null);
-      setSession(null);
-      setError(null);
-    } catch (err: any) {
-      setError(err.message);
-      throw err;
-    }
+    setLoading(true);
+    await supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
+    setLoading(false);
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, loading, error, signIn, signUp, signOut }}>
+    <AuthContext.Provider
+      value={{ session, user, loading, error, signIn, signUp, signOut }}
+    >
       {children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used within AuthProvider');
-  return context;
+export const useAuth = (): AuthContextType => {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
 };
