@@ -21,6 +21,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [error, setError] = useState<string | null>(null);
 
   const fetchUserData = async (id: string) => {
+    console.log('[Auth] 🔍 fetchUserData start for ID:', id);
     try {
       const { data, error: fetchError } = await supabase
         .from<UserData>('users')
@@ -31,11 +32,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(data || null);
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      console.log('[Auth] ✅ fetchUserData done — clearing loading');
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    // Get initial session on mount
+    // initial session
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       if (data.session?.user) {
@@ -45,8 +49,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     });
 
-    // Subscribe to auth changes
-    const authListener = supabase.auth.onAuthStateChange((_, sess) => {
+    // auth state change
+    const { subscription } = supabase.auth.onAuthStateChange((_, sess) => {
       setSession(sess);
       if (sess?.user) {
         fetchUserData(sess.user.id);
@@ -56,15 +60,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     });
 
-    // authListener could be a Subscription or an object with .subscription
-    const subscription = ('unsubscribe' in authListener)
-      ? authListener
-      : (authListener as any).subscription;
-
-    // Cleanup
-    return () => {
-      subscription?.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -78,8 +74,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     if (data.session?.user) {
       await fetchUserData(data.session.user.id);
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const signUp = async (email: string, password: string, role: UserData['role']) => {
@@ -101,8 +98,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return;
       }
       await fetchUserData(signUpData.user.id);
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const signOut = async () => {
