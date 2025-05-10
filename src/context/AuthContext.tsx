@@ -92,22 +92,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const signIn = async (email: string, pass: string) => {
+  const signIn = async (email: string, password: string) => {
     try {
       setError(null);
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
-        password: pass,
+        password,
       });
-      
+
       if (signInError) {
-        setError(signInError.message);
-        return;
+        throw signInError;
       }
 
-      if (data.session?.user) {
-        await fetchUserData(data.session.user.id);
+      if (!data.user) {
+        throw new Error('No user returned after sign in');
       }
+
+      const userData = await fetchUserData(data.user.id);
+      if (!userData) {
+        throw new Error('Failed to fetch user data');
+      }
+
+      setSession(data.session);
+      setUser(userData);
     } catch (err: any) {
       setError(err.message);
       throw err;

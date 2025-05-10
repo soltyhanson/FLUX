@@ -10,13 +10,11 @@ const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
-  const [localLoading, setLocalLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const { signIn, user, loading, error } = useAuth();
+  const { signIn, user, loading: authLoading, error: authError } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  
-  const from = (location.state as any)?.from?.pathname || '/dashboard';
 
   useEffect(() => {
     if (user) {
@@ -25,26 +23,42 @@ const Login: React.FC = () => {
         : user.role === 'client'
         ? '/dashboard/client'
         : '/dashboard/technician';
-      navigate(dest);
+      navigate(dest, { replace: true });
     }
   }, [user, navigate]);
 
+  useEffect(() => {
+    if (authError) {
+      setFormError(authError);
+      setIsSubmitting(false);
+    }
+  }, [authError]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     setFormError(null);
-    setLocalLoading(true);
+    setIsSubmitting(true);
 
     try {
       await signIn(email, password);
-      if (error) {
-        setFormError(error);
-      }
     } catch (err: any) {
-      setFormError(err.message || 'Sign in failed');
-    } finally {
-      setLocalLoading(false);
+      setFormError(err.message || 'Failed to sign in');
+      setIsSubmitting(false);
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-neutral-50">
+        <div className="animate-pulse flex flex-col items-center">
+          <div className="h-12 w-12 bg-primary-500 rounded-full mb-4"></div>
+          <div className="h-4 w-32 bg-neutral-200 rounded"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-neutral-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -87,6 +101,7 @@ const Login: React.FC = () => {
                 placeholder="you@example.com"
                 fullWidth
                 required
+                disabled={isSubmitting}
               />
 
               <Input
@@ -97,6 +112,7 @@ const Login: React.FC = () => {
                 placeholder="••••••••"
                 fullWidth
                 required
+                disabled={isSubmitting}
               />
             </CardContent>
 
@@ -104,10 +120,10 @@ const Login: React.FC = () => {
               <Button
                 type="submit"
                 fullWidth
-                disabled={localLoading}
-                isLoading={localLoading}
+                disabled={isSubmitting}
+                isLoading={isSubmitting}
               >
-                <LogIn className="h-4 w-4 mr-2" />
+                {!isSubmitting && <LogIn className="h-4 w-4 mr-2" />}
                 Sign in
               </Button>
 
