@@ -2,7 +2,6 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
 
-// Define the shape of user data
 export interface UserData {
   id: string;
   email: string;
@@ -29,7 +28,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch user profile from 'users' table
   const fetchUserData = async (id: string) => {
     try {
       const { data, error: fetchError } = await supabase
@@ -38,149 +36,127 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('id', id)
         .single();
 
-      if (fetchError) {
-        console.error('[Auth] ❌ fetchUserData error:', fetchError.message);
-        setUser(null);
-        setError('Failed to fetch user profile');
-        return;
-      }
-
-      if (!data) {
-        console.warn('[Auth] ⚠️ No user profile found');
-        setUser(null);
-        setError('User profile not found');
-        return;
-      }
+      if (fetchError) throw fetchError;
+      if (!data) throw new Error('User profile not found');
 
       setUser(data);
       setError(null);
+      return data;
     } catch (err: any) {
-      console.error('[Auth] ❌ fetchUserData error:', err.message);
+      console.error('Error fetching user data:', err.message);
       setUser(null);
-      setError('Failed to fetch user profile');
+      setError(err.message);
+      return null;
     }
   };
 
-  // Initialize auth on mount
   useEffect(() => {
+    let mounted = true;
+
     const initializeAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
         
-        if (session?.user) {
-          await fetchUserData(session.user.id);
+        if (mounted) {
+          setSession(session);
+          if (session?.user) {
+            await fetchUserData(session.user.id);
+          }
         }
       } catch (err) {
-        console.error('[Auth] ❌ Error initializing auth:', err);
+        console.error('Auth initialization error:', err);
       } finally {
-        // Always set loading to false after initialization
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
 
     initializeAuth();
 
-    // Subscribe to auth changes
-    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setSession(session);
-      
-      if (session?.user) {
-        await fetchUserData(session.user.id);
-      } else {
-        setUser(null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (mounted) {
+        setSession(session);
+        if (session?.user) {
+          await fetchUserData(session.user.id);
+        } else {
+          setUser(null);
+        }
+        setLoading(false);
       }
-      // Ensure loading is false after auth state change
-      setLoading(false);
     });
 
     return () => {
-      listener.subscription.unsubscribe();
+      mounted = false;
+      subscription.unsubscribe();
     };
   }, []);
 
-  // Sign in existing user
   const signIn = async (email: string, password: string) => {
     setLoading(true);
     setError(null);
     
     try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({ 
-        email, 
-        password 
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password
       });
-      
-      if (signInError) {
-        throw new Error('Invalid email or password');
-      }
-      
-      if (!data.session?.user) {
-        throw new Error('Sign in failed - no session returned');
-      }
+
+      if (signInError) throw signInError;
+      if (!data.session?.user) throw new Error('No session after sign in');
 
       await fetchUserData(data.session.user.id);
     } catch (err: any) {
       setError(err.message);
-      setUser(null);
       throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  // Sign up new user + insert into 'users' table
   const signUp = async (email: string, password: string, role: UserRole) => {
     setLoading(true);
     setError(null);
 
     try {
-      const { data, error: signUpError } = await supabase.auth.signUp({ 
-        email, 
-        password 
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password
       });
 
-      if (signUpError) {
-        throw new Error(signUpError.message);
-      }
-
-      if (!data.user) {
-        throw new Error('Sign up failed - no user returned');
-      }
+      if (signUpError) throw signUpError;
+      if (!data.user) throw new Error('No user after sign up');
 
       const { error: insertError } = await supabase
         .from('users')
-        .insert([{ 
-          id: data.user.id, 
-          email: data.user.email!, 
-          role 
+        .insert([{
+          id: data.user.id,
+          email: data.user.email!,
+          role
         }]);
 
-      if (insertError) {
-        throw new Error('Failed to create user profile');
-      }
+      if (insertError) throw insertError;
 
-      await fetchUserData(data.user.id);
+      if (data.session) {
+        await fetchUserData(data.user.id);
+      }
     } catch (err: any) {
       setError(err.message);
-      setUser(null);
       throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  // Sign out user
   const signOut = async () => {
-    setLoading(true);
     try {
       await supabase.auth.signOut();
       setUser(null);
       setSession(null);
       setError(null);
     } catch (err: any) {
-      setError('Failed to sign out');
-    } finally {
-      setLoading(false);
+      setError(err.message);
+      throw err;
     }
   };
 

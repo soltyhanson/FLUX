@@ -1,46 +1,36 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../components/ui/Card';
+import { UserPlus, BarChart } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
-import { UserPlus, BarChart } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../components/ui/Card';
+import { UserRole } from '../lib/supabaseClient';
 
 const Signup: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'client' | 'technician'>('client');
-  const [formError, setFormError] = useState<string | null>(null);
+  const [role, setRole] = useState<UserRole>('client');
+  const [error, setError] = useState<string | null>(null);
 
-  const { signUp, user, loading } = useAuth();
+  const { signUp, loading } = useAuth();
   const navigate = useNavigate();
-
-  // Redirect on successful signup
-  useEffect(() => {
-    if (user) {
-      if (user.role === 'admin') navigate('/dashboard/admin');
-      if (user.role === 'client') navigate('/dashboard/client');
-      if (user.role === 'technician') navigate('/dashboard/tech');
-    }
-  }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFormError(null);
+    setError(null);
 
-    if (!email.trim() || !password.trim()) {
-      setFormError('Please fill in all fields.');
-      return;
-    }
     if (password.length < 6) {
-      setFormError('Password must be at least 6 characters.');
+      setError('Password must be at least 6 characters');
       return;
     }
 
     try {
-      await signUp(email.trim(), password, role);
+      await signUp(email, password, role);
+      navigate('/dashboard');
     } catch (err: any) {
-      setFormError(err.message);
+      setError(err.message);
+      console.error('Signup error:', err);
     }
   };
 
@@ -61,24 +51,24 @@ const Signup: React.FC = () => {
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <Card className="animate-fade-in">
-          <CardHeader>
-            <CardTitle>Sign Up</CardTitle>
-            <CardDescription>
-              Enter your details to create your account
-            </CardDescription>
-          </CardHeader>
-
+        <Card>
           <form onSubmit={handleSubmit}>
+            <CardHeader>
+              <CardTitle>Sign Up</CardTitle>
+              <CardDescription>
+                Enter your details to create your account
+              </CardDescription>
+            </CardHeader>
+
             <CardContent className="space-y-4">
-              {formError && (
+              {error && (
                 <div className="bg-error-50 border border-error-300 text-error-700 px-4 py-3 rounded-md text-sm">
-                  {formError}
+                  {error}
                 </div>
               )}
 
               <Input
-                label="Email address"
+                label="Email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -99,12 +89,12 @@ const Signup: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">
-                  Account type
+                  Account Type
                 </label>
                 <select
                   value={role}
-                  onChange={(e) => setRole(e.target.value as 'client' | 'technician')}
-                  className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-neutral-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
+                  onChange={(e) => setRole(e.target.value as UserRole)}
+                  className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
                 >
                   <option value="client">Client</option>
                   <option value="technician">Technician</option>

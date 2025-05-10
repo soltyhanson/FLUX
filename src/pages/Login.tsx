@@ -9,31 +9,27 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const { signIn } = useAuth();
+  const { signIn, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
-  const from = (location.state as any)?.from?.pathname || '/';
-  
+  const from = (location.state as any)?.from?.pathname || '/dashboard';
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setLoading(true);
     
     try {
       await signIn(email, password);
       navigate(from, { replace: true });
     } catch (err: any) {
       setError('Invalid email or password');
-      console.error(err);
-    } finally {
-      setLoading(false);
+      console.error('Login error:', err);
     }
   };
-  
+
   return (
     <div className="min-h-screen bg-neutral-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
@@ -49,37 +45,37 @@ const Login: React.FC = () => {
           Welcome back! Please sign in to continue.
         </p>
       </div>
-      
+
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <Card className="animate-fade-in">
-          <CardHeader>
-            <CardTitle>Sign In</CardTitle>
-            <CardDescription>
-              Enter your credentials to access your account
-            </CardDescription>
-          </CardHeader>
-          
+        <Card>
           <form onSubmit={handleSubmit}>
+            <CardHeader>
+              <CardTitle>Sign In</CardTitle>
+              <CardDescription>
+                Enter your credentials to access your account
+              </CardDescription>
+            </CardHeader>
+
             <CardContent className="space-y-4">
               {error && (
                 <div className="bg-error-50 border border-error-300 text-error-700 px-4 py-3 rounded-md text-sm">
                   {error}
                 </div>
               )}
-              
-              <Input 
+
+              <Input
                 label="Email"
-                type="email" 
+                type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
                 fullWidth
                 required
               />
-              
-              <Input 
+
+              <Input
                 label="Password"
-                type="password" 
+                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
@@ -87,17 +83,17 @@ const Login: React.FC = () => {
                 required
               />
             </CardContent>
-            
+
             <CardFooter className="flex flex-col space-y-4">
-              <Button 
-                type="submit" 
-                fullWidth 
+              <Button
+                type="submit"
+                fullWidth
                 isLoading={loading}
               >
                 <LogIn className="h-4 w-4 mr-2" />
                 Sign in
               </Button>
-              
+
               <p className="text-center text-sm text-neutral-600">
                 Don't have an account?{' '}
                 <Link to="/signup" className="font-medium text-primary-600 hover:text-primary-500">
