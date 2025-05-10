@@ -37,30 +37,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('users')
         .select('id, email, role')
         .eq('id', id)
-        .single();
+        .maybeSingle();
 
       console.log('[Auth] 🎉 supabase response:', { data, fetchError });
       
       if (fetchError) {
-        if (fetchError.code === 'PGRST116') {
-          console.warn('[Auth] ⚠️ No user profile row found');
-          setUser(null);
-          throw new Error('User profile not found');
-        }
-        throw fetchError;
+        console.error('[Auth] ❌ fetchUserData error:', fetchError.message);
+        setUser(null);
+        setError('Failed to fetch user profile');
+        return;
       }
 
       if (!data) {
-        console.warn('[Auth] ⚠️ No user profile data returned');
+        console.warn('[Auth] ⚠️ No user profile found');
         setUser(null);
-        throw new Error('User profile not found');
+        setError('User profile not found');
+        return;
       }
 
       setUser(data);
+      setError(null);
     } catch (err: any) {
       console.error('[Auth] ❌ fetchUserData error:', err.message);
-      setError(err.message);
-      throw err;
+      setUser(null);
+      setError('Failed to fetch user profile');
     } finally {
       setLoading(false);
     }
@@ -69,32 +69,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Initialize auth on mount
   useEffect(() => {
     console.log('[Auth] 🔄 Setting up auth state listener');
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('[Auth] 📊 getSession returned:', session);
-      setSession(session);
-      if (session?.user) {
-        console.log('[Auth] 👤 Existing session detected, fetching user data');
-        fetchUserData(session.user.id).catch(() => {
-          setUser(null);
+    
+    const initializeAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log('[Auth] 📊 getSession returned:', session);
+        setSession(session);
+        
+        if (session?.user) {
+          console.log('[Auth] 👤 Existing session detected, fetching user data');
+          await fetchUserData(session.user.id);
+        } else {
+          console.log('[Auth] 🚫 No session found — clearing loading');
           setLoading(false);
-        });
-      } else {
-        console.log('[Auth] 🚫 No session found — clearing loading');
+        }
+      } catch (err) {
+        console.error('[Auth] ❌ Error initializing auth:', err);
         setLoading(false);
       }
-    });
+    };
+
+    initializeAuth();
 
     // Subscribe to auth changes
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
       console.log('[Auth] 🔄 Auth state changed:', _event, session);
       setSession(session);
+      
       if (session?.user) {
         console.log('[Auth] 👤 New session detected, fetching user data');
-        fetchUserData(session.user.id).catch(() => {
-          setUser(null);
-          setLoading(false);
-        });
+        await fetchUserData(session.user.id);
       } else {
         console.log('[Auth] 🚪 Signed out — clearing user & loading');
         setUser(null);
@@ -120,7 +124,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password 
       });
       
-      if (signInError) throw signInError;
+      if (signInError) {
+        throw new Error('Invalid email or password');
+      }
       
       if (!data.session?.user) {
         throw new Error('Sign in failed - no session returned');
@@ -130,7 +136,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await fetchUserData(data.session.user.id);
     } catch (err: any) {
       console.error('[Auth] ❌ signIn error:', err.message);
-      setError('Invalid email or password');
+      setError(err.message);
+      setUser(null);
       throw err;
     } finally {
       setLoading(false);
@@ -150,10 +157,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (signUpError) {
-        if (signUpError.message.includes('already registered')) {
-          throw new Error('This email is already registered. Please sign in instead.');
-        }
-        throw signUpError;
+        throw new Error(signUpError.message);
       }
 
       if (!data.user) {
@@ -179,6 +183,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err: any) {
       console.error('[Auth] ❌ signUp error:', err.message);
       setError(err.message);
+      setUser(null);
       throw err;
     } finally {
       setLoading(false);
@@ -189,10 +194,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     console.log('[Auth] 🚪 signOut called');
     setLoading(true);
-    await supabase.auth.signOut();
-    setUser(null);
-    setSession(null);
-    setLoading(false);
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      setSession(null);
+      setError(null);
+    } catch (err: any) {
+      console.error('[Auth] ❌ signOut error:', err.message);
+      setError('Failed to sign out');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
