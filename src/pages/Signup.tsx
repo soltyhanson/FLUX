@@ -1,124 +1,80 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import type { Session } from '@supabase/supabase-js';
-import { supabase, UserData } from '../lib/supabaseClient';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
-interface AuthContextType {
-  session: Session | null;
-  user: UserData | null;
-  loading: boolean;
-  error: string | null;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, role: UserData['role']) => Promise<void>;
-  signOut: () => Promise<void>;
-}
+const Signup: React.FC = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState<'client' | 'technician'>('client');
+  const [formError, setFormError] = useState<string | null>(null);
+  const { signUp, user, loading, error } = useAuth();
+  const navigate = useNavigate();
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<UserData | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchUserData = async (id: string) => {
-    try {
-      const { data, error: fetchError } = await supabase
-        .from<UserData>('users')
-        .select('id,email,role')
-        .eq('id', id)
-        .maybeSingle();
-      if (fetchError) throw fetchError;
-      setUser(data || null);
-    } catch (err: any) {
-      setError(err.message);
-    }
-  };
-
+  // Redirect when profile appears
   useEffect(() => {
-    // Initial session
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      if (data.session?.user) {
-        fetchUserData(data.session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
-
-    // Auth state changes
-    const { data } = supabase.auth.onAuthStateChange((_event, sess) => {
-      setSession(sess);
-      if (sess?.user) {
-        fetchUserData(sess.user.id);
-      } else {
-        setUser(null);
-        setLoading(false);
-      }
-    });
-
-    const subscription = data.subscription;
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  const signIn = async (email: string, password: string) => {
-    setLoading(true);
-    setError(null);
-    const {
-      data: { session: newSession },
-      error: signInError,
-    } = await supabase.auth.signInWithPassword({ email, password });
-    if (signInError) {
-      setError(signInError.message);
-      setLoading(false);
-      return;
+    if (user) {
+      const dest =
+        user.role === 'admin'
+          ? '/dashboard/admin'
+          : user.role === 'client'
+          ? '/dashboard/client'
+          : '/dashboard/technician';
+      navigate(dest, { replace: true });
     }
-    setSession(newSession);
-    if (newSession?.user) await fetchUserData(newSession.user.id);
-    setLoading(false);
-  };
+  }, [user, navigate]);
 
-  const signUp = async (email: string, password: string, role: UserData['role']) => {
-    setLoading(true);
-    setError(null);
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
-    if (signUpError) {
-      setError(signUpError.message);
-      setLoading(false);
-      return;
-    }
-    if (signUpData.user) {
-      const { error: insertError } = await supabase
-        .from('users')
-        .insert([{ id: signUpData.user.id, email: signUpData.user.email!, role }]);
-      if (insertError) {
-        setError(insertError.message);
-        setLoading(false);
-        return;
-      }
-      await fetchUserData(signUpData.user.id);
-    }
-    setLoading(false);
-  };
-
-  const signOut = async () => {
-    setLoading(true);
-    await supabase.auth.signOut();
-    setUser(null);
-    setSession(null);
-    setLoading(false);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+    await signUp(email, password, role);
+    if (error) setFormError(error);
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, loading, error, signIn, signUp, signOut }}>
-      {children}
-    </AuthContext.Provider>
+    <div className="min-h-screen flex items-center justify-center">
+      <form onSubmit={handleSubmit} className="p-6 border rounded">
+        <h1 className="text-2xl mb-4">Sign up for FLUX</h1>
+        {formError && <div className="mb-2 text-red-600">{formError}</div>}
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          className="w-full p-2 border mb-4"
+          required
+        />
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+          className="w-full p-2 border mb-4"
+          required
+        />
+        <select
+          value={role}
+          onChange={e => setRole(e.target.value as any)}
+          className="w-full p-2 border mb-4"
+        >
+          <option value="client">Client</option>
+          <option value="technician">Technician</option>
+        </select>
+        <button
+          type="submit"
+          disabled={loading}
+          className={`w-full p-2 bg-green-500 text-white ${loading ? 'opacity-50' : ''}`}
+        >
+          {loading ? 'Loading…' : 'Sign Up'}
+        </button>
+        <p className="mt-4 text-sm">
+          Have an account?{' '}
+          <Link to="/login" className="text-blue-600">
+            Sign in
+          </Link>
+        </p>
+      </form>
+    </div>
   );
 };
 
-export const useAuth = (): AuthContextType => {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used within AuthProvider');
-  return context;
-};
+export default Signup;
