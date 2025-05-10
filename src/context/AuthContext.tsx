@@ -37,15 +37,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     try {
       console.log('🔎 Executing Supabase query...');
-      const query = supabase
+      const { data, error, status, statusText } = await supabase
         .from('users')
         .select('id, email, role')
         .eq('id', id)
         .single();
-      
-      console.log('📝 Query details:', query.toSQL());
-      
-      const { data, error, status, statusText } = await query;
+
       console.log('📊 Full Supabase response:', {
         data,
         error,
