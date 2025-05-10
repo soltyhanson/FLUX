@@ -31,27 +31,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Fetch a single user row
   async function fetchUserData(id: string) {
     console.log('🔍 Fetching user data for ID:', id);
+    console.log('📡 Supabase URL:', supabase.supabaseUrl);
+    console.log('🔑 Using anon key:', supabase.supabaseKey.slice(0, 8) + '...');
+    
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      console.log('🔎 Executing Supabase query...');
+      const query = supabase
         .from('users')
         .select('id, email, role')
         .eq('id', id)
         .single();
-
-      console.log('📊 Supabase response:', { data, error });
+      
+      console.log('📝 Query details:', query.toSQL());
+      
+      const { data, error, status, statusText } = await query;
+      console.log('📊 Full Supabase response:', {
+        data,
+        error,
+        status,
+        statusText,
+        hasData: !!data,
+        errorMessage: error?.message,
+        errorDetails: error?.details
+      });
 
       if (error) {
-        console.error('❌ Error fetching user data:', error);
+        console.error('❌ Error fetching user data:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
         setError(error.message);
         setLoading(false);
         return;
       }
 
-      console.log('✅ User data retrieved:', data);
+      if (!data) {
+        console.warn('⚠️ No user data found for ID:', id);
+        setError('User data not found');
+        setLoading(false);
+        return;
+      }
+
+      console.log('✅ User data retrieved:', {
+        id: data.id,
+        email: data.email,
+        role: data.role
+      });
       setUser(data);
     } catch (err: any) {
-      console.error('❌ Exception in fetchUserData:', err);
+      console.error('❌ Exception in fetchUserData:', {
+        name: err.name,
+        message: err.message,
+        stack: err.stack
+      });
       setError(err.message);
     } finally {
       console.log('🏁 Finished fetching user data');
@@ -69,7 +104,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password,
       });
 
-      console.log('🔑 Sign up response:', { signUpData, signUpError });
+      console.log('🔑 Sign up response:', {
+        user: signUpData?.user?.id,
+        error: signUpError?.message
+      });
 
       if (signUpError) {
         console.error('❌ Sign up error:', signUpError);
@@ -86,13 +124,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      console.log('👤 Inserting user data into users table');
+      console.log('👤 Inserting user data into users table:', {
+        id: user.id,
+        email: user.email,
+        role
+      });
+      
       const { error: insertError } = await supabase
         .from('users')
         .insert([{ id: user.id, email: user.email, role }]);
 
       if (insertError) {
-        console.error('❌ Error inserting user data:', insertError);
+        console.error('❌ Error inserting user data:', {
+          message: insertError.message,
+          details: insertError.details,
+          hint: insertError.hint,
+          code: insertError.code
+        });
         setError(insertError.message);
         setLoading(false);
         return;
@@ -101,7 +149,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('✅ User data inserted successfully');
       await fetchUserData(user.id);
     } catch (err: any) {
-      console.error('❌ Exception in signUp:', err);
+      console.error('❌ Exception in signUp:', {
+        name: err.name,
+        message: err.message,
+        stack: err.stack
+      });
       setError(err.message);
       setLoading(false);
     }
@@ -116,7 +168,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password,
       });
 
-      console.log('🔑 Sign in response:', { data, signInError });
+      console.log('🔑 Sign in response:', {
+        session: !!data.session,
+        user: data.user?.id,
+        error: signInError?.message
+      });
 
       if (signInError) {
         console.error('❌ Sign in error:', signInError);
@@ -134,7 +190,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(false);
       }
     } catch (err: any) {
-      console.error('❌ Exception in signIn:', err);
+      console.error('❌ Exception in signIn:', {
+        name: err.name,
+        message: err.message,
+        stack: err.stack
+      });
       setError(err.message);
       setLoading(false);
     }
@@ -148,7 +208,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       setSession(null);
     } catch (err: any) {
-      console.error('❌ Error during sign out:', err);
+      console.error('❌ Error during sign out:', {
+        name: err.name,
+        message: err.message,
+        stack: err.stack
+      });
       setError(err.message);
     } finally {
       setLoading(false);
@@ -162,7 +226,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const fetchSession = async () => {
       console.log('📡 Fetching current session');
       const { data: { session } } = await supabase.auth.getSession();
-      console.log('📊 Current session:', session);
+      console.log('📊 Current session:', {
+        exists: !!session,
+        userId: session?.user?.id
+      });
       setSession(session);
       
       if (session?.user?.id) {
@@ -179,7 +246,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('🔄 Auth state changed:', event);
-      console.log('📊 New session:', session);
+      console.log('📊 New session:', {
+        exists: !!session,
+        userId: session?.user?.id
+      });
       
       setSession(session);
       
