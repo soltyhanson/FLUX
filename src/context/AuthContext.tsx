@@ -20,7 +20,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch user profile from our users table
   const fetchUserData = async (id: string) => {
     try {
       const { data, error: fetchError } = await supabase
@@ -36,7 +35,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   useEffect(() => {
-    // On mount: get initial session
+    // Get initial session on mount
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       if (data.session?.user) {
@@ -47,7 +46,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
 
     // Subscribe to auth changes
-    const { subscription } = supabase.auth.onAuthStateChange((_, sess) => {
+    const authListener = supabase.auth.onAuthStateChange((_, sess) => {
       setSession(sess);
       if (sess?.user) {
         fetchUserData(sess.user.id);
@@ -57,13 +56,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     });
 
-    // Cleanup on unmount
+    // authListener could be a Subscription or an object with .subscription
+    const subscription = ('unsubscribe' in authListener)
+      ? authListener
+      : (authListener as any).subscription;
+
+    // Cleanup
     return () => {
-      subscription.unsubscribe();
+      subscription?.unsubscribe();
     };
   }, []);
 
-  // Sign in with email/password
   const signIn = async (email: string, password: string) => {
     setLoading(true);
     setError(null);
@@ -79,31 +82,29 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setLoading(false);
   };
 
-  // Sign up and insert into users table
   const signUp = async (email: string, password: string, role: UserData['role']) => {
     setLoading(true);
     setError(null);
-    const { data, error: signUpError } = await supabase.auth.signUp({ email, password });
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
     if (signUpError) {
       setError(signUpError.message);
       setLoading(false);
       return;
     }
-    if (data.user) {
+    if (signUpData.user) {
       const { error: insertError } = await supabase
         .from('users')
-        .insert([{ id: data.user.id, email: data.user.email!, role }]);
+        .insert([{ id: signUpData.user.id, email: signUpData.user.email!, role }]);
       if (insertError) {
         setError(insertError.message);
         setLoading(false);
         return;
       }
-      await fetchUserData(data.user.id);
+      await fetchUserData(signUpData.user.id);
     }
     setLoading(false);
   };
 
-  // Sign out
   const signOut = async () => {
     setLoading(true);
     await supabase.auth.signOut();
