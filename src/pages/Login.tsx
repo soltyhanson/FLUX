@@ -24,16 +24,10 @@ const Login: React.FC = () => {
     setLoading(true);
     
     try {
-      const { error } = await signIn(email, password);
-      
-      if (error) {
-        setError(error.message);
-        return;
-      }
-      
+      await signIn(email, password);
       navigate(from, { replace: true });
-    } catch (err) {
-      setError('An unexpected error occurred');
+    } catch (err: any) {
+      setError('Invalid email or password');
       console.error(err);
     } finally {
       setLoading(false);
