@@ -27,12 +27,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   if (!user) {
-    // Redirect to login if not authenticated
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   if (!allowedRoles.includes(user.role)) {
-    // Redirect to the appropriate dashboard if authenticated but not authorized
     switch (user.role) {
       case 'admin':
         return <Navigate to="/dashboard/admin" replace />;
