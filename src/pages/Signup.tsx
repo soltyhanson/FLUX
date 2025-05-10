@@ -1,129 +1,81 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { UserPlus, BarChart } from 'lucide-react';
-import Button from '../components/ui/Button';
-import Input from '../components/ui/Input';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../components/ui/Card';
-import { UserRole } from '../lib/supabaseClient';
 
-const Signup: React.FC = () => {
+export default function Signup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<UserRole>('client');
-  const [error, setError] = useState<string | null>(null);
-
-  const { signUp, loading } = useAuth();
+  const [role, setRole] = useState<'client' | 'technician'>('client');
+  const [formError, setFormError] = useState<string | null>(null);
+  const { signUp, user, loading, error } = useAuth();
   const navigate = useNavigate();
+
+  // redirect when profile appears
+  useEffect(() => {
+    if (user) {
+      const dest =
+        user.role === 'admin'
+          ? '/dashboard/admin'
+          : user.role === 'client'
+          ? '/dashboard/client'
+          : '/dashboard/technician';
+      navigate(dest, { replace: true });
+    }
+  }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return;
-    }
-
-    try {
-      await signUp(email, password, role);
-      navigate('/dashboard');
-    } catch (err: any) {
-      setError(err.message);
-      console.error('Signup error:', err);
-    }
+    setFormError(null);
+    await signUp(email, password, role);
+    if (error) setFormError(error);
   };
 
   return (
-    <div className="min-h-screen bg-neutral-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex justify-center">
-          <div className="h-12 w-12 bg-primary-600 text-white flex items-center justify-center rounded-lg">
-            <BarChart className="h-8 w-8" />
-          </div>
+    <div className="min-h-screen flex items-center justify-center">
+      <form onSubmit={handleSubmit} className="p-6 border rounded">
+        <h1 className="text-2xl mb-4">Sign up for FLUX</h1>
+        {formError && <div className="mb-2 text-red-600">{formError}</div>}
+        <div className="mb-2">
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            className="w-full p-2 border"
+            required
+          />
         </div>
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-neutral-900">
-          Create your account
-        </h2>
-        <p className="mt-2 text-center text-sm text-neutral-600">
-          Join FLUX and get started today
+        <div className="mb-2">
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            className="w-full p-2 border"
+            required
+          />
+        </div>
+        <div className="mb-4">
+          <select
+            value={role}
+            onChange={e => setRole(e.target.value as any)}
+            className="w-full p-2 border"
+          >
+            <option value="client">Client</option>
+            <option value="technician">Technician</option>
+          </select>
+        </div>
+        <button
+          type="submit"
+          disabled={loading}
+          className={`w-full p-2 bg-green-500 text-white ${loading ? 'opacity-50' : ''}`}
+        >
+          {loading ? 'Loading…' : 'Sign Up'}
+        </button>
+        <p className="mt-4 text-sm">
+          Have an account? <Link to="/login" className="text-blue-600">Sign in</Link>
         </p>
-      </div>
-
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <Card>
-          <form onSubmit={handleSubmit}>
-            <CardHeader>
-              <CardTitle>Sign Up</CardTitle>
-              <CardDescription>
-                Enter your details to create your account
-              </CardDescription>
-            </CardHeader>
-
-            <CardContent className="space-y-4">
-              {error && (
-                <div className="bg-error-50 border border-error-300 text-error-700 px-4 py-3 rounded-md text-sm">
-                  {error}
-                </div>
-              )}
-
-              <Input
-                label="Email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                fullWidth
-                required
-              />
-
-              <Input
-                label="Password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                fullWidth
-                required
-              />
-
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">
-                  Account Type
-                </label>
-                <select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value as UserRole)}
-                  className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
-                >
-                  <option value="client">Client</option>
-                  <option value="technician">Technician</option>
-                </select>
-              </div>
-            </CardContent>
-
-            <CardFooter className="flex flex-col space-y-4">
-              <Button
-                type="submit"
-                fullWidth
-                isLoading={loading}
-              >
-                <UserPlus className="h-4 w-4 mr-2" />
-                Create Account
-              </Button>
-
-              <p className="text-center text-sm text-neutral-600">
-                Already have an account?{' '}
-                <Link to="/login" className="font-medium text-primary-600 hover:text-primary-500">
-                  Sign in
-                </Link>
-              </p>
-            </CardFooter>
-          </form>
-        </Card>
-      </div>
+      </form>
     </div>
   );
-};
-
-export default Signup;
+}
