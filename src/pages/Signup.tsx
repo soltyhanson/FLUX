@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
-import { Spinner } from '../components/ui/Spinner';
 
 const Signup: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -43,53 +40,58 @@ const Signup: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-lg shadow-md">
-        <h1 className="text-3xl font-bold text-blue-600 text-center">FLUX</h1>
-        {formError && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
-            {formError}
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+      <div style={{ width: 360, padding: 24, border: '1px solid #ddd', borderRadius: 8 }}>
+        <h1 style={{ textAlign: 'center' }}>FLUX Signup</h1>
+        {formError && <div style={{ color: 'red', marginBottom: 16 }}>{formError}</div>}
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: 12 }}>
+            <label>Email address</label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              required
+              style={{ width: '100%', padding: 8, boxSizing: 'border-box' }}
+            />
           </div>
-        )}
-        <form className="mt-6 space-y-6" onSubmit={handleSubmit}>
-          <Input
-            label="Email address"
-            type="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            required
-          />
-          <Input
-            label="Password"
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            required
-          />
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Account type</label>
+          <div style={{ marginBottom: 12 }}>
+            <label>Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required
+              style={{ width: '100%', padding: 8, boxSizing: 'border-box' }}
+            />
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <label>Account type</label>
             <select
               value={role}
               onChange={e => setRole(e.target.value as 'client' | 'technician')}
-              className="block w-full border-gray-300 rounded-md"
+              style={{ width: '100%', padding: 8, boxSizing: 'border-box' }}
             >
               <option value="client">Client</option>
               <option value="technician">Technician</option>
             </select>
           </div>
-          <Button type="submit" disabled={loading} className="w-full">
-            {loading ? <Spinner /> : 'Sign Up'}
-          </Button>
-          <p className="text-center text-sm">
-            Already have an account?{' '}
-            <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">
-              Sign in
-            </Link>
-          </p>
+          <button
+            type="submit"
+            disabled={loading}
+            style={{ width: '100%', padding: 12, backgroundColor: '#007bff', color: '#fff', border: 'none', borderRadius: 4 }}
+          >
+            {loading ? 'Loading...' : 'Sign Up'}
+          </button>
         </form>
+        <p style={{ marginTop: 16, textAlign: 'center' }}>
+          Already have an account? <Link to="/login">Sign in</Link>
+        </p>
       </div>
     </div>
   );
 };
 
 export default Signup;
+
+
