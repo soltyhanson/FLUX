@@ -1,19 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Make sure these env-vars are set in your Bolt integrations
+export const supabase = createClient(
+  import.meta.env.NEXT_PUBLIC_SUPABASE_URL,
+  import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
-}
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-export type UserRole = 'admin' | 'client' | 'technician';
-
-export interface User {
+// Shape of a row in public.users
+export interface UserData {
   id: string;
   email: string;
-  role: UserRole;
-  created_at: string;
+  role: 'admin' | 'client' | 'technician';
 }
