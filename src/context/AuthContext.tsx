@@ -93,22 +93,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signIn = async (email: string, pass: string) => {
-    setLoading(true);
-    setError(null);
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password: pass,
-    });
-    if (signInError) {
-      setError(signInError.message);
-      setLoading(false);
-      return;
+    try {
+      setError(null);
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: pass,
+      });
+      
+      if (signInError) {
+        setError(signInError.message);
+        return;
+      }
+
+      if (data.session?.user) {
+        await fetchUserData(data.session.user.id);
+      }
+    } catch (err: any) {
+      setError(err.message);
+      throw err;
     }
-    // if we got a session & user, fetch profile
-    if (data.session?.user) {
-      await fetchUserData(data.session.user.id);
-    }
-    setLoading(false);
   };
 
   const signUp = async (email: string, password: string, role: UserRole) => {

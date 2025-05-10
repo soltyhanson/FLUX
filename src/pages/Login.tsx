@@ -104,8 +104,8 @@ const Login: React.FC = () => {
               <Button
                 type="submit"
                 fullWidth
-                disabled={localLoading || loading}
-                isLoading={localLoading || loading}
+                disabled={localLoading}
+                isLoading={localLoading}
               >
                 <LogIn className="h-4 w-4 mr-2" />
                 Sign in
