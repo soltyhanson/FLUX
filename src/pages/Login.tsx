@@ -12,7 +12,7 @@ const Login: React.FC = () => {
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const { signIn, user, loading: authLoading, error: authError } = useAuth();
+  const { signIn, user, error: authError } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -48,17 +48,6 @@ const Login: React.FC = () => {
       setIsSubmitting(false);
     }
   };
-
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-neutral-50">
-        <div className="animate-pulse flex flex-col items-center">
-          <div className="h-12 w-12 bg-primary-500 rounded-full mb-4"></div>
-          <div className="h-4 w-32 bg-neutral-200 rounded"></div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-neutral-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
