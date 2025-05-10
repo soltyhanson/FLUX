@@ -6,8 +6,9 @@ interface AuthContextType {
   session: Session | null;
   user: User | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: any | null }>;
-  signUp: (email: string, password: string, role: UserRole) => Promise<{ error: any | null, user: any | null }>;
+  error: string | null;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, role: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -25,6 +26,74 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch a single user row
+  async function fetchUserData(id: string) {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, email, role')
+      .eq('id', id)
+      .single();
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+      return;
+    }
+    setUser(data);
+    setLoading(false);
+  }
+
+  // Sign up, then insert into users table
+  async function signUp(email: string, password: string, role: string) {
+    setLoading(true);
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+    if (signUpError) {
+      setError(signUpError.message);
+      setLoading(false);
+      return;
+    }
+
+    const user = signUpData.user;
+    // Insert the new user row
+    const { error: insertError } = await supabase
+      .from('users')
+      .insert([{ id: user.id, email: user.email, role }]);
+    if (insertError) {
+      setError(insertError.message);
+      setLoading(false);
+      return;
+    }
+
+    // Fetch full profile and redirect
+    await fetchUserData(user.id);
+    setLoading(false);
+  }
+
+  async function signIn(email: string, password: string) {
+    setLoading(true);
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (signInError) {
+      setError(signInError.message);
+      setLoading(false);
+      return;
+    }
+    const user = data.user;
+    await fetchUserData(user.id);
+  }
+
+  async function signOut() {
+    await supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
+  }
 
   useEffect(() => {
     // Fetch the current session
@@ -33,13 +102,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       
       if (session?.user?.id) {
-        const { data } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
-          
-        setUser(data as User);
+        await fetchUserData(session.user.id);
       }
       
       setLoading(false);
@@ -52,13 +115,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       
       if (session?.user?.id) {
-        const { data } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
-          
-        setUser(data as User);
+        await fetchUserData(session.user.id);
       } else {
         setUser(null);
       }
@@ -71,63 +128,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const signUp = async (email: string, password: string, role: UserRole) => {
-    try {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-
-      if (authError) {
-        return { error: authError, user: null };
-      }
-
-      if (authData.user) {
-        // Insert the new user into our users table with their role
-        const { error: profileError } = await supabase
-          .from('users')
-          .insert([
-            {
-              id: authData.user.id,
-              email,
-              role,
-            },
-          ]);
-
-        if (profileError) {
-          return { error: profileError, user: null };
-        }
-
-        return { error: null, user: authData.user };
-      }
-
-      return { error: new Error('User creation failed'), user: null };
-    } catch (error) {
-      return { error, user: null };
-    }
-  };
-
-  const signIn = async (email: string, password: string) => {
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      return { error };
-    } catch (error) {
-      return { error };
-    }
-  };
-
-  const signOut = async () => {
-    await supabase.auth.signOut();
-  };
-
   const value = {
     session,
     user,
     loading,
+    error,
     signIn,
     signUp,
     signOut,
