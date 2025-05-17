@@ -19,42 +19,31 @@ export default function JobFormCreate() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-
-    if (user.role === 'admin') {
+    if (user?.role === 'admin') {
       supabase
         .from('users')
         .select('id,email')
         .eq('role', 'technician')
         .then(({ data, error }) => {
           if (error) setError(error.message);
-          else if (data) setTechOpts(data);
+          else if (data) setTechOpts(data as any);
         });
     }
-  }, [user, navigate]);
+  }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    if (!user) {
-      setError('You must be logged in to create a job');
-      setLoading(false);
-      return;
-    }
-
-    const payload = {
-      client_id: user.role === 'admin' ? technicianId : user.id,
+    const payload: any = {
+      client_id: user!.id,
       title,
       description,
       site_location: siteLocation,
       status: 'Allocated',
       scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
-      technician_id: user.role === 'admin' ? technicianId : null,
+      technician_id: user!.role === 'admin' ? technicianId || null : null,
     };
 
     const { error: insertErr } = await supabase.from('jobs').insert([payload]);
