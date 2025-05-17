@@ -2,14 +2,18 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
-import Layout from './components/layout/AppLayout';
+import Layout from './components/Layout';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import AdminDashboard from './pages/dashboard/AdminDashboard';
 import ClientDashboard from './pages/dashboard/ClientDashboard';
 import TechDashboard from './pages/dashboard/TechDashboard';
-import JobsList from './components/JobsList';
 import ProtectedRoute from './components/ProtectedRoute';
+
+// Jobs
+import JobsList from './components/JobsList';
+import JobFormCreate from './components/JobFormCreate';
+import JobFormEdit from './components/JobFormEdit';
 
 function App() {
   return (
@@ -17,9 +21,11 @@ function App() {
       <Router>
         <Layout>
           <Routes>
+            {/* Public */}
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
 
+            {/* Dashboard */}
             <Route
               path="/dashboard/admin"
               element={
@@ -28,7 +34,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/dashboard/client"
               element={
@@ -37,7 +42,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/dashboard/technician"
               element={
@@ -47,24 +51,33 @@ function App() {
               }
             />
 
+            {/* Jobs CRUD */}
             <Route
               path="/jobs"
               element={
-                <ProtectedRoute roles={['admin', 'client', 'technician']}>
+                <ProtectedRoute roles={['admin','client','technician']}>
                   <JobsList />
                 </ProtectedRoute>
               }
             />
-
             <Route
               path="/jobs/new"
               element={
-                <ProtectedRoute roles={['admin', 'technician']}>
-                  <div>Job Form Create (to be implemented)</div>
+                <ProtectedRoute roles={['admin','technician']}>
+                  <JobFormCreate />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/jobs/:id"
+              element={
+                <ProtectedRoute roles={['admin','client','technician']}>
+                  <JobFormEdit />
                 </ProtectedRoute>
               }
             />
 
+            {/* Fallback */}
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </Layout>
@@ -73,4 +86,4 @@ function App() {
   );
 }
 
-export default App
+export default App;
