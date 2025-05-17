@@ -8,6 +8,7 @@ import Signup from './pages/Signup';
 import AdminDashboard from './pages/dashboard/AdminDashboard';
 import ClientDashboard from './pages/dashboard/ClientDashboard';
 import TechDashboard from './pages/dashboard/TechDashboard';
+import JobsList from './components/JobsList';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -46,6 +47,24 @@ function App() {
               }
             />
 
+            <Route
+              path="/jobs"
+              element={
+                <ProtectedRoute roles={['admin', 'client', 'technician']}>
+                  <JobsList />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/jobs/new"
+              element={
+                <ProtectedRoute roles={['admin', 'technician']}>
+                  <div>Job Form Create (to be implemented)</div>
+                </ProtectedRoute>
+              }
+            />
+
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </Layout>
@@ -53,5 +72,3 @@ function App() {
     </AuthProvider>
   );
 }
-
-export default App;
