@@ -26,43 +26,73 @@ export default function JobFormCreate() {
       setIsLoadingClients(true);
       setError(null);
       
+      console.log('=== Debug: fetchClients start ===');
+      console.log('Current user:', user);
+      console.log('User role:', user?.role);
+      console.log('User ID:', user?.id);
+      
       try {
-        console.log('Fetching clients...');
-        const { data, error: fetchError } = await supabase
+        console.log('Building Supabase query...');
+        const query = supabase
           .from('users')
           .select('id, email')
           .eq('role', 'client');
 
-        console.log('Fetch response:', { data, error: fetchError });
+        console.log('Executing query...');
+        const { data, error: fetchError } = await query;
+
+        console.log('Query response:', {
+          success: !fetchError,
+          error: fetchError,
+          dataLength: data?.length ?? 0,
+          data
+        });
 
         if (fetchError) {
-          console.error('Error fetching clients:', fetchError);
+          console.error('Error details:', {
+            message: fetchError.message,
+            code: fetchError.code,
+            details: fetchError.details,
+            hint: fetchError.hint
+          });
           setError(fetchError.message);
           return;
         }
 
         if (!data) {
-          console.warn('No data returned from clients query');
+          console.warn('No data returned from query');
           setClients([]);
           return;
         }
 
-        console.log('Setting clients:', data);
+        console.log('Successfully fetched clients:', {
+          count: data.length,
+          clients: data
+        });
         setClients(data);
       } catch (err) {
-        console.error('Error in fetchClients:', err);
+        console.error('Unexpected error in fetchClients:', err);
         setError('Failed to fetch clients');
       } finally {
+        console.log('=== Debug: fetchClients end ===');
         setIsLoadingClients(false);
       }
     };
 
     const fetchTechnicians = async () => {
+      console.log('=== Debug: fetchTechnicians start ===');
       try {
         const { data, error: fetchError } = await supabase
           .from('users')
           .select('id, email')
           .eq('role', 'technician');
+
+        console.log('Technicians query response:', {
+          success: !fetchError,
+          error: fetchError,
+          dataLength: data?.length ?? 0,
+          data
+        });
 
         if (fetchError) {
           console.error('Error fetching technicians:', fetchError);
@@ -71,25 +101,43 @@ export default function JobFormCreate() {
         }
 
         if (data) {
+          console.log('Setting technicians:', data);
           setTechOpts(data);
         }
       } catch (err) {
         console.error('Error in fetchTechnicians:', err);
         setError('Failed to fetch technicians');
+      } finally {
+        console.log('=== Debug: fetchTechnicians end ===');
       }
     };
 
-    // Only fetch if user is logged in and has appropriate role
+    console.log('=== Debug: useEffect start ===');
+    console.log('Component mounted/updated with user:', user);
+
     if (user && (user.role === 'admin' || user.role === 'technician')) {
+      console.log('User has permission to fetch clients');
       fetchClients();
+    } else {
+      console.log('User does not have permission to fetch clients:', {
+        userExists: !!user,
+        userRole: user?.role
+      });
     }
 
     if (user && user.role === 'admin') {
+      console.log('User is admin, fetching technicians');
       fetchTechnicians();
     }
+    console.log('=== Debug: useEffect end ===');
   }, [user]);
 
   const filteredClients = useMemo(() => {
+    console.log('Filtering clients:', {
+      totalClients: clients.length,
+      searchTerm,
+      currentClientId: clientId
+    });
     return clients.filter(client =>
       client.email.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -100,6 +148,16 @@ export default function JobFormCreate() {
     setLoading(true);
     setError(null);
 
+    console.log('=== Debug: handleSubmit start ===');
+    console.log('Form submission data:', {
+      title,
+      description,
+      clientId,
+      scheduledAt,
+      technicianId,
+      userRole: user?.role
+    });
+
     const payload: any = {
       client_id: user?.role === 'client' ? user.id : clientId,
       title,
@@ -109,14 +167,19 @@ export default function JobFormCreate() {
       technician_id: user?.role === 'admin' ? technicianId || null : null,
     };
 
+    console.log('Submitting payload:', payload);
+
     const { error: insertErr } = await supabase.from('jobs').insert([payload]);
     setLoading(false);
 
     if (insertErr) {
+      console.error('Job creation error:', insertErr);
       setError(insertErr.message);
     } else {
+      console.log('Job created successfully');
       navigate('/jobs');
     }
+    console.log('=== Debug: handleSubmit end ===');
   };
 
   return (
