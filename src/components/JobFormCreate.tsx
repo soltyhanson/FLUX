@@ -19,14 +19,21 @@ export default function JobFormCreate() {
   const [techOpts, setTechOpts] = useState<{ id: string; email: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isLoadingClients, setIsLoadingClients] = useState(false);
 
   useEffect(() => {
     const fetchClients = async () => {
+      setIsLoadingClients(true);
+      setError(null);
+      
       try {
+        console.log('Fetching clients...');
         const { data, error: fetchError } = await supabase
           .from('users')
           .select('id, email')
           .eq('role', 'client');
+
+        console.log('Fetch response:', { data, error: fetchError });
 
         if (fetchError) {
           console.error('Error fetching clients:', fetchError);
@@ -34,12 +41,19 @@ export default function JobFormCreate() {
           return;
         }
 
-        if (data) {
-          setClients(data);
+        if (!data) {
+          console.warn('No data returned from clients query');
+          setClients([]);
+          return;
         }
+
+        console.log('Setting clients:', data);
+        setClients(data);
       } catch (err) {
         console.error('Error in fetchClients:', err);
         setError('Failed to fetch clients');
+      } finally {
+        setIsLoadingClients(false);
       }
     };
 
@@ -65,11 +79,12 @@ export default function JobFormCreate() {
       }
     };
 
-    if (user?.role === 'admin' || user?.role === 'technician') {
+    // Only fetch if user is logged in and has appropriate role
+    if (user && (user.role === 'admin' || user.role === 'technician')) {
       fetchClients();
     }
 
-    if (user?.role === 'admin') {
+    if (user && user.role === 'admin') {
       fetchTechnicians();
     }
   }, [user]);
@@ -91,7 +106,7 @@ export default function JobFormCreate() {
       description,
       status: 'Allocated',
       scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
-      technician_id: user!.role === 'admin' ? technicianId || null : null,
+      technician_id: user?.role === 'admin' ? technicianId || null : null,
     };
 
     const { error: insertErr } = await supabase.from('jobs').insert([payload]);
@@ -147,15 +162,24 @@ export default function JobFormCreate() {
               required
             >
               <option value="">— Select Client —</option>
-              {filteredClients.map(client => (
-                <option key={client.id} value={client.id}>
-                  {client.email}
-                </option>
-              ))}
+              {isLoadingClients ? (
+                <option disabled>Loading clients...</option>
+              ) : (
+                filteredClients.map(client => (
+                  <option key={client.id} value={client.id}>
+                    {client.email}
+                  </option>
+                ))
+              )}
             </select>
-            {filteredClients.length === 0 && searchTerm && (
+            {!isLoadingClients && filteredClients.length === 0 && searchTerm && (
               <p className="mt-1 text-sm text-neutral-500">
                 No clients found matching "{searchTerm}"
+              </p>
+            )}
+            {!isLoadingClients && filteredClients.length === 0 && !searchTerm && (
+              <p className="mt-1 text-sm text-neutral-500">
+                No clients available
               </p>
             )}
           </div>
@@ -186,7 +210,7 @@ export default function JobFormCreate() {
           </div>
         )}
         <div className="flex justify-end">
-          <Button type="submit" disabled={loading}>
+          <Button type="submit" disabled={loading} isLoading={loading}>
             {loading ? 'Creating…' : 'Create Job'}
           </Button>
         </div>
