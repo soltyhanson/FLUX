@@ -138,9 +138,11 @@ export default function JobFormCreate() {
       searchTerm,
       currentClientId: clientId
     });
-    return clients.filter(client =>
-      client.email.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // Temporarily return all clients without filtering
+    return clients;
+    // return clients.filter(client =>
+    //   client.email.toLowerCase().includes(searchTerm.toLowerCase())
+    // );
   }, [clients, searchTerm]);
 
   const handleSubmit = async (e: React.FormEvent) => {
