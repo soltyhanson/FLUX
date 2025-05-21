@@ -59,17 +59,20 @@ CREATE POLICY "Technicians can select all jobs"
   USING (EXISTS (SELECT 1 FROM public.users u WHERE u.id = auth.uid() AND u.role = 'technician'));
 
 
--- 7️⃣ Clients: SELECT only their own jobs
+-- Clients: SELECT only their own jobs
 CREATE POLICY "Clients select own jobs"
   ON jobs FOR SELECT
   TO authenticated
-  USING ( client_id = auth.uid() );
+  USING (client_id = auth.uid() AND EXISTS (SELECT 1 FROM public.users u WHERE u.id = auth.uid() AND u.role = 'client'));
 
--- 8️⃣ Clients: INSERT only their own jobs
+
+
+-- Clients: INSERT only their own jobs
 CREATE POLICY "Clients insert own jobs"
   ON jobs FOR INSERT
   TO authenticated
-  WITH CHECK ( client_id = auth.uid() );
+  WITH CHECK (client_id = auth.uid() AND EXISTS (SELECT 1 FROM public.users u WHERE u.id = auth.uid() AND u.role = 'client'));
+
 
 -- 9️⃣ Admins & Technicians: UPDATE any job
 CREATE POLICY "Admins & techs update jobs"
@@ -94,3 +97,10 @@ CREATE POLICY "Admins & techs delete jobs"
         AND u.role IN ('admin','technician')
     )
   );
+
+-- Clients: UPDATE only their own jobs (excluding status)
+CREATE POLICY "Clients update own jobs (no status change)"
+  ON jobs FOR UPDATE
+  TO authenticated
+  USING (client_id = auth.uid() AND EXISTS (SELECT 1 FROM public.users u WHERE u.id = auth.uid() AND u.role = 'client'))
+  WITH CHECK (client_id = auth.uid() AND OLD.status = NEW.status AND EXISTS (SELECT 1 FROM public.users u WHERE u.id = auth.uid() AND u.role = 'client'));
