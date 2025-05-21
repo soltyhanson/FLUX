@@ -1,4 +1,3 @@
-// src/components/JobFormCreate.tsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
@@ -11,7 +10,8 @@ export default function JobFormCreate() {
   const { user } = useAuth();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [siteLocation, setSiteLocation] = useState('');
+  const [clientId, setClientId] = useState<string>('');
+  const [clients, setClients] = useState<{ id: string; email: string }[]>([]);
   const [scheduledAt, setScheduledAt] = useState('');
   const [technicianId, setTechnicianId] = useState<string>('');
   const [techOpts, setTechOpts] = useState<{ id: string; email: string }[]>([]);
@@ -19,6 +19,23 @@ export default function JobFormCreate() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    const fetchClients = async () => {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, email')
+        .eq('role', 'client');
+
+      if (error) {
+        setError(error.message);
+      } else {
+        setClients(data as any);
+      }
+    };
+
+    if (user?.role === 'admin' || user?.role === 'technician') {
+      fetchClients();
+    }
+
     if (user?.role === 'admin') {
       supabase
         .from('users')
@@ -37,10 +54,9 @@ export default function JobFormCreate() {
     setError(null);
 
     const payload: any = {
-      client_id: user!.id,
+      client_id: user?.role === 'client' ? user.id : clientId,
       title,
       description,
-      site_location: siteLocation,
       status: 'Allocated',
       scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
       technician_id: user!.role === 'admin' ? technicianId || null : null,
@@ -73,10 +89,24 @@ export default function JobFormCreate() {
             className="w-full px-3 py-2 min-h-[150px] bg-white border border-neutral-300 rounded-md shadow-sm placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-opacity-50 focus:border-primary-500"
           />
         </div>
-        <div>
-          <label className="block mb-1">Site Location</label>
-          <Input value={siteLocation} onChange={e => setSiteLocation(e.target.value)} />
-        </div>
+        {(user?.role === 'admin' || user?.role === 'technician') && (
+          <div>
+            <label className="block mb-1">Client</label>
+            <select
+              className="w-full px-3 py-2 bg-white border border-neutral-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-opacity-50 focus:border-primary-500"
+              value={clientId}
+              onChange={e => setClientId(e.target.value)}
+              required
+            >
+              <option value="">— Select Client —</option>
+              {clients.map(client => (
+                <option key={client.id} value={client.id}>
+                  {client.email}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div>
           <label className="block mb-1">Scheduled At</label>
           <Input
@@ -89,7 +119,7 @@ export default function JobFormCreate() {
           <div>
             <label className="block mb-1">Assign Technician</label>
             <select
-              className="mt-1 block w-full rounded border-gray-300"
+              className="w-full px-3 py-2 bg-white border border-neutral-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-opacity-50 focus:border-primary-500"
               value={technicianId}
               onChange={e => setTechnicianId(e.target.value)}
             >
