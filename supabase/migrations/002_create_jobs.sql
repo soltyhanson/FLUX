@@ -52,6 +52,13 @@ CREATE POLICY "Admins & techs insert jobs"
     )
   );
 
+-- Technicians: SELECT all jobs
+CREATE POLICY "Technicians can select all jobs"
+  ON jobs FOR SELECT
+  TO authenticated
+  USING (EXISTS (SELECT 1 FROM public.users u WHERE u.id = auth.uid() AND u.role = 'technician'));
+
+
 -- 7️⃣ Clients: SELECT only their own jobs
 CREATE POLICY "Clients select own jobs"
   ON jobs FOR SELECT
