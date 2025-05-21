@@ -67,7 +67,11 @@ export default function JobFormCreate() {
         </div>
         <div>
           <label className="block mb-1">Description</label>
-          <Input value={description} onChange={e => setDescription(e.target.value)} />
+          <textarea
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            className="w-full px-3 py-2 min-h-[150px] bg-white border border-neutral-300 rounded-md shadow-sm placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-opacity-50 focus:border-primary-500"
+          />
         </div>
         <div>
           <label className="block mb-1">Site Location</label>
