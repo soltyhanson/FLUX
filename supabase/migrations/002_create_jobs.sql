@@ -31,16 +31,13 @@ DROP POLICY IF EXISTS "Admins & techs delete jobs" ON jobs;
 DROP POLICY IF EXISTS "Clients select own jobs" ON jobs;
 DROP POLICY IF EXISTS "Clients insert own jobs" ON jobs;
 
--- 5️⃣ Admins & Technicians: SELECT any job
-CREATE POLICY "Admins & techs select jobs"
-  ON jobs FOR SELECT
+-- Admins: Full access
+CREATE POLICY "Admins have full access"
+  ON jobs
+  FOR ALL
   TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.users u
-      WHERE u.id = auth.uid()
-        AND u.role IN ('admin','technician')
-    )
+  USING (EXISTS (SELECT 1 FROM public.users u WHERE u.id = auth.uid() AND u.role = 'admin'))
+  WITH CHECK (EXISTS (
   );
 
 -- 6️⃣ Admins & Technicians: INSERT jobs
