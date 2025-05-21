@@ -1,6 +1,6 @@
 -- supabase/migrations/002_create_jobs.sql
 
--- 1️⃣ Drop existing jobs table (and all old policies/triggers)
+-- 1️⃣ Drop any old table & policies
 DROP TABLE IF EXISTS jobs CASCADE;
 
 -- 2️⃣ Recreate jobs table
@@ -10,11 +10,13 @@ CREATE TABLE jobs (
   technician_id  UUID           REFERENCES users(id),
   title          TEXT           NOT NULL,
   description    TEXT,
-  status         TEXT           NOT NULL
-                    CHECK (status IN (
-                      'Allocated','In Progress',
-                      'Ready to Invoice','Invoice Sent','Paid'
-                    )),
+  status         TEXT           NOT NULL CHECK (status IN (
+                    'Allocated',
+                    'In Progress',
+                    'Ready to Invoice',
+                    'Invoice Sent',
+                    'Paid'
+                  )),
   site_location  TEXT,
   scheduled_at   TIMESTAMPTZ,
   created_at     TIMESTAMPTZ    DEFAULT now()
@@ -23,84 +25,74 @@ CREATE TABLE jobs (
 -- 3️⃣ Enable RLS
 ALTER TABLE jobs ENABLE ROW LEVEL SECURITY;
 
--- 4️⃣ DROP any old policies to avoid conflicts
-DROP POLICY IF EXISTS "Admins & techs select jobs" ON jobs;
-DROP POLICY IF EXISTS "Admins & techs insert jobs" ON jobs;
-DROP POLICY IF EXISTS "Admins & techs update jobs" ON jobs;
-DROP POLICY IF EXISTS "Admins & techs delete jobs" ON jobs;
-DROP POLICY IF EXISTS "Clients select own jobs" ON jobs;
-DROP POLICY IF EXISTS "Clients insert own jobs" ON jobs;
+-- 4️⃣ Drop any old policies
+DROP POLICY IF EXISTS "Admins full access"           ON jobs;
+DROP POLICY IF EXISTS "Technicians select jobs"      ON jobs;
+DROP POLICY IF EXISTS "Technicians insert jobs"      ON jobs;
+DROP POLICY IF EXISTS "Technicians update jobs"      ON jobs;
+DROP POLICY IF EXISTS "Clients select own jobs"      ON jobs;
+DROP POLICY IF EXISTS "Clients insert own jobs"      ON jobs;
+DROP POLICY IF EXISTS "Admins & techs update jobs"   ON jobs;
+DROP POLICY IF EXISTS "Admins & techs delete jobs"   ON jobs;
+DROP POLICY IF EXISTS "Clients update own jobs (no status change)" ON jobs;
 
--- Admins: Full access
-CREATE POLICY "Admins have full access"
-  ON jobs
-  FOR ALL
+-- 5️⃣ Admins: full CRUD
+CREATE POLICY "Admins full access"
+  ON jobs FOR ALL
   TO authenticated
-  USING (EXISTS (SELECT 1 FROM public.users u WHERE u.id = auth.uid() AND u.role = 'admin'))
-  WITH CHECK (EXISTS (
-  );
-
--- 6️⃣ Admins & Technicians: INSERT jobs
-CREATE POLICY "Admins & techs insert jobs"
-  ON jobs FOR INSERT
-  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM users u
+      WHERE u.id = auth.uid()
+        AND u.role = 'admin'
+    )
+  )
   WITH CHECK (
     EXISTS (
-      SELECT 1 FROM public.users u
+      SELECT 1 FROM users u
       WHERE u.id = auth.uid()
-        AND u.role IN ('admin','technician')
+        AND u.role = 'admin'
     )
   );
 
--- Technicians: SELECT all jobs
-CREATE POLICY "Technicians can select all jobs"
+-- 6️⃣ Technicians: select/insert/update
+CREATE POLICY "Technicians select jobs"
   ON jobs FOR SELECT
   TO authenticated
-  USING (EXISTS (SELECT 1 FROM public.users u WHERE u.id = auth.uid() AND u.role = 'technician'));
+  USING ( auth.uid() IN (
+    SELECT id FROM users WHERE role = 'technician'
+  ));
 
+CREATE POLICY "Technicians insert jobs"
+  ON jobs FOR INSERT
+  TO authenticated
+  WITH CHECK ( auth.uid() IN (
+    SELECT id FROM users WHERE role = 'technician'
+  ));
 
--- Clients: SELECT only their own jobs
+CREATE POLICY "Technicians update jobs"
+  ON jobs FOR UPDATE
+  TO authenticated
+  USING ( auth.uid() IN (
+    SELECT id FROM users WHERE role = 'technician'
+  ));
+
+-- 7️⃣ Clients: only their own
 CREATE POLICY "Clients select own jobs"
   ON jobs FOR SELECT
   TO authenticated
-  USING (client_id = auth.uid() AND EXISTS (SELECT 1 FROM public.users u WHERE u.id = auth.uid() AND u.role = 'client'));
+  USING ( client_id = auth.uid() );
 
-
-
--- Clients: INSERT only their own jobs
 CREATE POLICY "Clients insert own jobs"
   ON jobs FOR INSERT
   TO authenticated
-  WITH CHECK (client_id = auth.uid() AND EXISTS (SELECT 1 FROM public.users u WHERE u.id = auth.uid() AND u.role = 'client'));
+  WITH CHECK ( client_id = auth.uid() );
 
-
--- 9️⃣ Admins & Technicians: UPDATE any job
-CREATE POLICY "Admins & techs update jobs"
-  ON jobs FOR UPDATE
-  TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.users u
-      WHERE u.id = auth.uid()
-        AND u.role IN ('admin','technician')
-    )
-  );
-
--- 🔟 Admins & Technicians: DELETE any job
-CREATE POLICY "Admins & techs delete jobs"
-  ON jobs FOR DELETE
-  TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.users u
-      WHERE u.id = auth.uid()
-        AND u.role IN ('admin','technician')
-    )
-  );
-
--- Clients: UPDATE only their own jobs (excluding status)
 CREATE POLICY "Clients update own jobs (no status change)"
   ON jobs FOR UPDATE
   TO authenticated
-  USING (client_id = auth.uid() AND EXISTS (SELECT 1 FROM public.users u WHERE u.id = auth.uid() AND u.role = 'client'))
-  WITH CHECK (client_id = auth.uid() AND OLD.status = NEW.status AND EXISTS (SELECT 1 FROM public.users u WHERE u.id = auth.uid() AND u.role = 'client'));
+  USING ( client_id = auth.uid() )
+  WITH CHECK (
+    client_id = auth.uid()
+    AND OLD.status = NEW.status
+  );
