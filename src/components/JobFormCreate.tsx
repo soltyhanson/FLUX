@@ -1,145 +1,157 @@
 // src/components/JobFormCreate.tsx
-import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { supabase }    from '../lib/supabaseClient'
-import { useAuth }     from '../context/AuthContext'
-import Button          from './ui/Button'
-import Input           from './ui/Input'
+import React, { useState, useEffect, FormEvent } from 'react'
+import { useNavigate }         from 'react-router-dom'
+import { supabase }            from '../lib/supabaseClient'
+import { useAuth }             from '../context/AuthContext'
+
+interface SimpleUser { id: string; email: string }
 
 export default function JobFormCreate() {
-  const navigate = useNavigate()
   const { user } = useAuth()
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [siteLocation, setSiteLocation] = useState('')
-  const [scheduledAt, setScheduledAt] = useState('')
-  const [clientId, setClientId] = useState<string>('')
-  const [techId, setTechId] = useState<string>('')
-  const [clientOpts, setClientOpts] = useState<{id:string,email:string}[]>([])
-  const [techOpts,   setTechOpts]   = useState<{id:string,email:string}[]>([])
-  const [error, setError]     = useState<string|null>(null)
-  const [loading, setLoading] = useState(false)
+  const nav      = useNavigate()
 
-  // 1️⃣ Fetch clients (admins and techs need to pick a client)
+  // dropdown data
+  const [ clients,    setClients    ] = useState<SimpleUser[]>([])
+  const [ technicians,setTechs      ] = useState<SimpleUser[]>([])
+  // form fields
+  const [ clientId,      setClientId      ] = useState<string>('')
+  const [ technicianId,  setTechnicianId  ] = useState<string>('')
+  const [ title,         setTitle         ] = useState<string>('')
+  const [ description,   setDescription   ] = useState<string>('')
+  const [ siteLocation,  setSiteLocation  ] = useState<string>('')
+  const [ scheduledAt,   setScheduledAt   ] = useState<string>('')
+  const [ loading,       setLoading       ] = useState<boolean>(false)
+
+  // fetch both lists on mount
   useEffect(() => {
-    if (user?.role === 'admin' || user?.role === 'technician') {
-      supabase
-        .from('users')
-        .select('id,email')
-        .eq('role','client')
-        .then(({data, error}) => {
-          if (error) setError(error.message)
-          else setClientOpts(data || [])
-        })
-    }
+    ;(async () => {
+      // fetch clients
+      let { data: _c, error: ce } = await supabase
+        .from<SimpleUser>('users')
+        .select('id, email')
+        .eq('role', 'client')
+      if (ce) console.error('fetch clients:', ce)
+      else setClients(_c!)
+
+      // fetch techs
+      let { data: _t, error: te } = await supabase
+        .from<SimpleUser>('users')
+        .select('id, email')
+        .eq('role', 'technician')
+      if (te) console.error('fetch techs:', te)
+      else setTechs(_t!)
+    })()
   }, [user])
 
-  // 2️⃣ Fetch techs (only admins assign tech)
-  useEffect(() => {
-    if (user?.role === 'admin') {
-      supabase
-        .from('users')
-        .select('id,email')
-        .eq('role','technician')
-        .then(({data, error}) => {
-          if (error) setError(error.message)
-          else setTechOpts(data || [])
-        })
-    }
-  }, [user])
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    setLoading(true)
-    setError(null)
-    // Build payload based on your role and selections:
-    const payload: any = {
-      client_id: user!.role === 'client' ? user!.id : clientId,
-      title,
-      description,
-      site_location: siteLocation,
-      status: 'Allocated',
-      scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
-      technician_id: user!.role === 'admin' ? techId || null : user!.role === 'technician' ? user!.id : null,
+    if (!clientId) {
+      alert('Please select a client')
+      return
     }
-
-    const { error: insertErr } = await supabase
+    setLoading(true)
+    const { error } = await supabase
       .from('jobs')
-      .insert([payload])
-
+      .insert({
+        client_id:     clientId,
+        technician_id: technicianId || null,
+        title,
+        description,
+        site_location: siteLocation,
+        scheduled_at:  scheduledAt,
+        status:        'Allocated'
+      })
     setLoading(false)
-    if (insertErr) setError(insertErr.message)
-    else navigate('/jobs')
+    if (error) {
+      console.error('create job error:', error)
+      alert(error.message)
+    } else {
+      nav('/dashboard/' + (user!.role === 'technician' ? 'technician' : 'admin'))
+    }
   }
 
   return (
-    <div className="max-w-lg mx-auto p-4">
-      <h2 className="text-2xl font-bold mb-4">Create Job</h2>
-      {error && <div className="text-red-600 mb-2">{error}</div>}
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Pick the client (admin & tech only) */}
-        {(user?.role === 'admin' || user?.role === 'technician') && (
-          <div>
-            <label className="block mb-1">Client</label>
-            <select
-              className="w-full border rounded p-2"
-              value={clientId}
-              onChange={e => setClientId(e.target.value)}
-              required
-            >
-              <option value="">Select a client</option>
-              {clientOpts.map(c => (
-                <option key={c.id} value={c.id}>{c.email}</option>
-              ))}
-            </select>
-          </div>
-        )}
+    <form onSubmit={handleSubmit} className="max-w-lg mx-auto p-6 space-y-4">
+      <h1 className="text-2xl font-bold">Create Job</h1>
 
-        {/* Job details */}
-        <div>
-          <label className="block mb-1">Title</label>
-          <Input value={title} onChange={e => setTitle(e.target.value)} required />
-        </div>
-        <div>
-          <label className="block mb-1">Description</label>
-          <Input value={description} onChange={e => setDescription(e.target.value)} />
-        </div>
-        <div>
-          <label className="block mb-1">Site Location</label>
-          <Input value={siteLocation} onChange={e => setSiteLocation(e.target.value)} />
-        </div>
-        <div>
-          <label className="block mb-1">Scheduled At</label>
-          <Input
-            type="datetime-local"
-            value={scheduledAt}
-            onChange={e => setScheduledAt(e.target.value)}
-          />
-        </div>
+      <label className="block">
+        Client
+        <select
+          className="mt-1 block w-full"
+          value={clientId}
+          onChange={e => setClientId(e.target.value)}
+          required
+        >
+          <option value="">— Select a client —</option>
+          {clients.map(c => (
+            <option key={c.id} value={c.id}>
+              {c.email}
+            </option>
+          ))}
+        </select>
+      </label>
 
-        {/* Assign technician (admin only) */}
-        {user?.role === 'admin' && (
-          <div>
-            <label className="block mb-1">Assign Technician</label>
-            <select
-              className="w-full border rounded p-2"
-              value={techId}
-              onChange={e => setTechId(e.target.value)}
-            >
-              <option value="">Unassigned</option>
-              {techOpts.map(t => (
-                <option key={t.id} value={t.id}>{t.email}</option>
-              ))}
-            </select>
-          </div>
-        )}
+      <label className="block">
+        Title
+        <input
+          className="mt-1 block w-full"
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          required
+        />
+      </label>
 
-        <div className="flex justify-end">
-          <Button type="submit" disabled={loading}>
-            {loading ? 'Creating…' : 'Create Job'}
-          </Button>
-        </div>
-      </form>
-    </div>
+      <label className="block">
+        Description
+        <textarea
+          className="mt-1 block w-full"
+          value={description}
+          onChange={e => setDescription(e.target.value)}
+        />
+      </label>
+
+      <label className="block">
+        Site Location
+        <input
+          className="mt-1 block w-full"
+          value={siteLocation}
+          onChange={e => setSiteLocation(e.target.value)}
+        />
+      </label>
+
+      <label className="block">
+        Scheduled At
+        <input
+          type="datetime-local"
+          className="mt-1 block w-full"
+          value={scheduledAt}
+          onChange={e => setScheduledAt(e.target.value)}
+        />
+      </label>
+
+      <label className="block">
+        Assign Technician
+        <select
+          className="mt-1 block w-full"
+          value={technicianId}
+          onChange={e => setTechnicianId(e.target.value)}
+        >
+          <option value="">— Unassigned —</option>
+          {technicians.map(t => (
+            <option key={t.id} value={t.id}>
+              {t.email}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <button
+        type="submit"
+        disabled={loading}
+        className="mt-4 px-4 py-2 bg-blue-600 text-white rounded"
+      >
+        {loading ? 'Creating…' : 'Create Job'}
+      </button>
+    </form>
   )
 }
